@@ -1,0 +1,22 @@
+sudo: false
+language: go
+go:
+  - 1.8
+  - 1.7
+  - master
+
+before_install:
+  - go get -t -v ./...
+
+script:
+  - go test -race -coverprofile=coverage.txt -covermode=atomic
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+
+notifications:
+  email:
+    recipients:
+    - paul.vanbrouwershaven@digitorus.com
+    on_success: never
+    on_failure: change
