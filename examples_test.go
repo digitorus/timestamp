@@ -29,5 +29,5 @@ func ExampleParseRequest() {
 	}
 
 	fmt.Printf("%x\n", parsedRequest.HashedMessage)
-	// Output: b4f6bd939c616808842180e3d5d466f86df2dcd209f14a1337b88d39ce4c021f
+	// Output: 62633c3232115454963ce641e5095c48a85dbec913a08332ad38586b910a3b27
 }
