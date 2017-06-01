@@ -147,9 +147,9 @@ func (req *Request) Marshal() ([]byte, error) {
 	})
 }
 
-// Response represents an Time-Stamp response. See
+// Timestamp represents an Time-Stamp. See:
 // https://tools.ietf.org/html/rfc3161#section-2.4.1
-type Response struct {
+type Timestamp struct {
 	HashAlgorithm crypto.Hash
 	HashedMessage []byte
 
@@ -160,9 +160,9 @@ type Response struct {
 	Certificates []*x509.Certificate
 
 	// Extensions contains raw X.509 extensions from the Extensions field of the
-	// Time-Stamp response. When parsing responseses, this can be used to extract
+	// Time-Stamp. When parsing time-stamps, this can be used to extract
 	// non-critical extensions that are not parsed by this package. When
-	// marshaling OCSP responseses, the Extensions field is ignored, see
+	// marshaling time-stamps, the Extensions field is ignored, see
 	// ExtraExtensions.
 	Extensions []pkix.Extension
 
@@ -173,12 +173,12 @@ type Response struct {
 	ExtraExtensions []pkix.Extension
 }
 
-// ParseResponse parses an Time-Stamp response in DER form. If the response
-// contains a certificate then the signature over the response is checked.
+// ParseResponse parses an Time-Stamp response in DER form containing a
+// TimeStampToken.
 //
 // Invalid signatures or parse failures will result in a ParseError. Error
 // responses will result in a ResponseError.
-func ParseResponse(bytes []byte) (*Response, error) {
+func ParseResponse(bytes []byte) (*Timestamp, error) {
 	var err error
 	var rest []byte
 	var resp response
@@ -199,7 +199,16 @@ func ParseResponse(bytes []byte) (*Response, error) {
 		return nil, ParseError("no pkcs7 data in Time-Stamp response")
 	}
 
-	p7, err := pkcs7.Parse(resp.TimeStampToken.FullBytes)
+	return Parse(resp.TimeStampToken.FullBytes)
+}
+
+// Parse parses an Time-Stamp in DER form. If the time-stamp contains a
+// certificate then the signature over the response is checked.
+//
+// Invalid signatures or parse failures will result in a ParseError. Error
+// responses will result in a ResponseError.
+func Parse(bytes []byte) (*Timestamp, error) {
+	p7, err := pkcs7.Parse(bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +225,7 @@ func ParseResponse(bytes []byte) (*Response, error) {
 		return nil, ParseError("Time-Stamp response contains no hashed message")
 	}
 
-	ret := &Response{
+	ret := &Timestamp{
 		HashedMessage: inf.MessageImprint.HashedMessage,
 		SerialNumber:  inf.SerialNumber,
 		Time:          inf.Time,
