@@ -212,8 +212,11 @@ func Parse(bytes []byte) (*Timestamp, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = p7.Verify(); err != nil {
-		return nil, err
+
+	if len(p7.Certificates) > 0 {
+		if err = p7.Verify(); err != nil {
+			return nil, err
+		}
 	}
 
 	var inf tstInfo
