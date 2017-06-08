@@ -67,7 +67,7 @@ var testCases = []testData{
 		response:      respNoNonce,
 		certificates:  true,
 		nonce:         nil,
-		time:          time.Date(2017, 4, 19, 6, 29, 53, 0, time.UTC),
+		time:          time.Date(2017, 4, 19, 6, 28, 13, 0, time.UTC),
 		accuracy:      time.Second,
 		hashedMessage: hashedMessage,
 		hashAlgorithm: crypto.SHA256,
@@ -78,7 +78,7 @@ var testCases = []testData{
 		response:      respNoCert,
 		certificates:  false,
 		nonce:         nil,
-		time:          time.Date(2017, 4, 19, 6, 29, 53, 0, time.UTC),
+		time:          time.Date(2017, 4, 19, 6, 32, 43, 0, time.UTC),
 		accuracy:      time.Second,
 		hashedMessage: hashedMessage,
 		hashAlgorithm: crypto.SHA256,
@@ -91,9 +91,14 @@ var testCases = []testData{
 func TestParseRequest(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.request == nil {
+				return
+			}
+
 			req, err := ParseRequest(tc.request)
 			if err != nil {
 				t.Errorf("failed to parse request: %s", err.Error())
+				return
 			}
 
 			if !bytes.Equal(req.HashedMessage, tc.hashedMessage) {
@@ -114,9 +119,14 @@ func TestParseRequest(t *testing.T) {
 func TestParseResponse(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			resp, err := ParseResponse(respNonce)
+			if tc.response == nil {
+				return
+			}
+
+			resp, err := ParseResponse(tc.response)
 			if err != nil {
 				t.Errorf("failed to parse response: %s", err.Error())
+				return
 			}
 
 			if !bytes.Equal(resp.HashedMessage, tc.hashedMessage) {
