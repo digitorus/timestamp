@@ -231,7 +231,7 @@ func TestCreateRequest(t *testing.T) {
 }
 
 func BenchmarkCreateRequest(b *testing.B) {
-	reader := strings.NewReader("Content to by time-stamped")
+	reader := strings.NewReader("Content to be time-stamped")
 
 	for n := 0; n < b.N; n++ {
 		CreateRequest(reader, nil)
@@ -253,7 +253,7 @@ func BenchmarkParseResponse(b *testing.B) {
 // ExampleCreateRequest demonstrates how to create a new time-stamping request
 // for an io.Reader.
 func ExampleCreateRequest() {
-	_, err := CreateRequest(strings.NewReader("Content to by time-stamped"), nil)
+	_, err := CreateRequest(strings.NewReader("Content to be time-stamped"), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -262,7 +262,7 @@ func ExampleCreateRequest() {
 // ExampleParseRequest demonstrates how to parse a raw der time-stamping request
 func ExampleParseRequest() {
 	// CreateRequest returns the request in der bytes
-	createdRequest, err := CreateRequest(strings.NewReader("Content to by time-stamped"), nil)
+	createdRequest, err := CreateRequest(strings.NewReader("Content to be time-stamped"), nil)
 	if err != nil {
 		panic(err)
 	}
