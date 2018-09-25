@@ -259,6 +259,19 @@ func ExampleCreateRequest() {
 	}
 }
 
+// ExampleCreateRequest_customHashingAlgorithm demonstrates how to create a new
+// time-stamping request with options
+func ExampleCreateRequest_customHashingAlgorithm() {
+	_, err := CreateRequest(
+		strings.NewReader("Content to be time-stamped"),
+		&RequestOptions{
+			Hash: crypto.SHA512,
+		})
+	if err != nil {
+		panic(err)
+	}
+}
+
 // ExampleParseRequest demonstrates how to parse a raw der time-stamping request
 func ExampleParseRequest() {
 	// CreateRequest returns the request in der bytes
