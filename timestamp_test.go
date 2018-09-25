@@ -3,7 +3,9 @@ package timestamp
 import (
 	"bytes"
 	"crypto"
-	"crypto/sha256"
+	_ "crypto/sha1"
+	_ "crypto/sha256"
+	_ "crypto/sha512"
 	"fmt"
 	"math/big"
 	"strings"
@@ -196,28 +198,35 @@ func TestMarshalRequest(t *testing.T) {
 }
 
 func TestCreateRequest(t *testing.T) {
-	msg := "Content to by timestamped"
+	var testHashes = []crypto.Hash{crypto.SHA1, crypto.SHA256, crypto.SHA384, crypto.SHA512}
+	for _, th := range testHashes {
+		t.Run(fmt.Sprintf("%d", th), func(t *testing.T) {
+			msg := "Content to by timestamped"
 
-	h := sha256.New()
-	h.Write([]byte(msg))
-	hashedMsg := h.Sum(nil)
+			h := th.New()
+			h.Write([]byte(msg))
+			hashedMsg := h.Sum(nil)
 
-	req, err := CreateRequest(strings.NewReader(msg), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+			req, err := CreateRequest(strings.NewReader(msg), &RequestOptions{
+				Hash: th,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	if len(req) == 0 {
-		t.Error("request contains no bytes")
-	}
+			if len(req) == 0 {
+				t.Error("request contains no bytes")
+			}
 
-	reqCheck, err := ParseRequest(req)
-	if err != nil {
-		t.Fatal(err)
-	}
+			reqCheck, err := ParseRequest(req)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	if !bytes.Equal(reqCheck.HashedMessage, hashedMsg) {
-		t.Errorf("reqCheck.HashedMessage: got %x, want %x", reqCheck.HashedMessage, hashedMsg)
+			if !bytes.Equal(reqCheck.HashedMessage, hashedMsg) {
+				t.Errorf("reqCheck.HashedMessage: got %x, want %x", reqCheck.HashedMessage, hashedMsg)
+			}
+		})
 	}
 }
 

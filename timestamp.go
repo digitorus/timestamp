@@ -275,7 +275,7 @@ func CreateRequest(r io.Reader, opts *RequestOptions) ([]byte, error) {
 	}
 	h := opts.hash().New()
 
-	b := make([]byte, 32)
+	b := make([]byte, h.Size())
 	for {
 		n, err := r.Read(b)
 		if err == io.EOF {
