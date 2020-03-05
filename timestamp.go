@@ -4,10 +4,11 @@ package timestamp
 
 import (
 	"crypto"
+	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
-	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -42,6 +43,26 @@ const (
 	// SystemFailure indicates that the request cannot be handled due to system
 	// failure
 	SystemFailure FailureInfo = 25
+)
+
+const (
+	// Granted PKIStatus contains the value zero a TimeStampToken, as requested, is present.
+	Granted int = 0
+
+	// GrantedWithMods PKIStatus contains the value one a TimeStampToken, with modifications, is present.
+	GrantedWithMods int = 1
+
+	// Rejection PKIStatus
+	Rejection int32 = 2
+
+	// Waiting PKIStatus
+	Waiting int = 3
+
+	// RevocationWarning PKIStatus
+	RevocationWarning int = 4
+
+	// RevocationNotification PKIStatus
+	RevocationNotification int = 5
 )
 
 func (f FailureInfo) String() string {
@@ -154,8 +175,12 @@ type Timestamp struct {
 	HashedMessage []byte
 
 	Time         time.Time
-	Accuracy     time.Duration
+	Accuracy     Accuracy
 	SerialNumber *big.Int
+	Policy       asn1.ObjectIdentifier
+	Ordering     bool
+	Nonce        *big.Int
+	Qualified    bool
 
 	Certificates []*x509.Certificate
 
@@ -232,12 +257,11 @@ func Parse(bytes []byte) (*Timestamp, error) {
 		HashedMessage: inf.MessageImprint.HashedMessage,
 		SerialNumber:  inf.SerialNumber,
 		Time:          inf.Time,
-		Accuracy: time.Duration((time.Second * time.Duration(inf.Accuracy.Seconds)) +
-			(time.Millisecond * time.Duration(inf.Accuracy.Milliseconds)) +
-			(time.Microsecond * time.Duration(inf.Accuracy.Microseconds))),
-		Certificates: p7.Certificates,
-
-		Extensions: inf.Extensions,
+		Accuracy:      inf.Accuracy,
+		Certificates:  p7.Certificates,
+		Nonce:         inf.Nonce,
+		Ordering:      inf.Ordering,
+		Extensions:    inf.Extensions,
 	}
 
 	ret.HashAlgorithm = getHashAlgorithmFromOID(inf.MessageImprint.HashAlgorithm.Algorithm)
@@ -245,6 +269,15 @@ func Parse(bytes []byte) (*Timestamp, error) {
 		return nil, ParseError("Time-Stamp response uses unknown hash function")
 	}
 
+	var policyOID asn1.ObjectIdentifier
+	if len(inf.Policy.FullBytes) != 0 {
+		asn1.Unmarshal(inf.Policy.FullBytes, &policyOID)
+	}
+	ret.Policy = policyOID
+
+	if oidInExtensions(asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 3}, inf.Extensions) {
+		ret.Qualified = true
+	}
 	return ret, nil
 }
 
@@ -302,6 +335,175 @@ func CreateRequest(r io.Reader, opts *RequestOptions) ([]byte, error) {
 //
 // The responder cert is used to populate the responder's name field, and the
 // certificate itself is provided alongside the timestamp response signature.
-func CreateResponse(signingCert *x509.Certificate, priv crypto.Signer) ([]byte, error) {
-	return nil, errors.New("CreateResponse not implemented")
+func (t *Timestamp) CreateResponse(signingCert *x509.Certificate, priv crypto.Signer) ([]byte, error) {
+	messageImprint := getMessageImprint(t.HashAlgorithm, t.HashedMessage)
+
+	tsaSerialNumber, err := generateTSASerialNumber()
+	if err != nil {
+		return nil, err
+	}
+	tstInfo, err := t.populateTSTInfo(messageImprint, t.Policy, tsaSerialNumber, signingCert)
+	if err != nil {
+		return nil, err
+	}
+	signature, err := generateSignedData(tstInfo, priv, signingCert)
+	if err != nil {
+		return nil, err
+	}
+	timestampRes := response{
+		Status: pkiStatusInfo{
+			Status: Granted,
+		},
+		TimeStampToken: asn1.RawValue{FullBytes: signature},
+	}
+	tspResponseBytes, err := asn1.Marshal(timestampRes)
+	if err != nil {
+		return nil, err
+	}
+	return tspResponseBytes, nil
+}
+
+func getMessageImprint(hashAlgorithm crypto.Hash, hashedMessage []byte) messageImprint {
+	messageImprint := messageImprint{
+		HashAlgorithm: pkix.AlgorithmIdentifier{
+			Algorithm:  getOIDFromHashAlgorithm(hashAlgorithm),
+			Parameters: asn1.NullRawValue,
+		},
+		HashedMessage: hashedMessage,
+	}
+	return messageImprint
+}
+
+func generateTSASerialNumber() (*big.Int, error) {
+	randomBytes := make([]byte, 20)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return nil, err
+	}
+	serialNumber := big.NewInt(0)
+	serialNumber = serialNumber.SetBytes(randomBytes)
+	return serialNumber, nil
+}
+
+func (t *Timestamp) populateTSTInfo(messageImprint messageImprint, policyOID asn1.ObjectIdentifier, tsaSerialNumber *big.Int, tsaCert *x509.Certificate) ([]byte, error) {
+	policyOIDBytes, err := asn1.Marshal(policyOID)
+	if err != nil {
+		return nil, err
+	}
+	tsaNameBytes, err := asn1.Marshal(tsaCert.Subject.ToRDNSequence())
+	if err != nil {
+		return nil, err
+	}
+	dirGeneralName, err := asn1.Marshal(asn1.RawValue{Tag: 4, Class: 2, IsCompound: true, Bytes: tsaNameBytes})
+	if err != nil {
+		return nil, err
+	}
+	tstInfo := tstInfo{
+		Version:        1,
+		Policy:         asn1.RawValue{FullBytes: policyOIDBytes},
+		MessageImprint: messageImprint,
+		SerialNumber:   tsaSerialNumber,
+		TSA:            asn1.RawValue{Tag: 0, Class: 2, IsCompound: true, Bytes: dirGeneralName},
+		Time:           t.Time,
+		Ordering:       t.Ordering,
+	}
+	if t.Nonce != nil {
+		tstInfo.Nonce = t.Nonce
+	}
+	if t.Accuracy != (Accuracy{}) {
+		tstInfo.Accuracy = t.Accuracy
+	}
+	if len(t.ExtraExtensions) != 0 {
+		tstInfo.Extensions = t.ExtraExtensions
+	}
+	if t.Qualified && !oidInExtensions(asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 3}, t.ExtraExtensions) {
+		qcStatements := []qcStatement{
+			qcStatement{
+				StatementID: asn1.ObjectIdentifier{0, 4, 0, 19422, 1, 1},
+			},
+		}
+		asn1QcStats, err := asn1.Marshal(qcStatements)
+		if err != nil {
+			return nil, err
+		}
+		tstInfo.Extensions = append(tstInfo.Extensions, pkix.Extension{
+			Id:       []int{1, 3, 6, 1, 5, 5, 7, 1, 3},
+			Value:    asn1QcStats,
+			Critical: false,
+		})
+	}
+	tstInfoBytes, err := asn1.Marshal(tstInfo)
+	if err != nil {
+		return nil, err
+	}
+	return tstInfoBytes, nil
+}
+
+func populateSigningCertificateV2Ext(certificate *x509.Certificate) ([]byte, error) {
+	h := sha256.New()
+	h.Write(certificate.Raw)
+
+	signingCertificateV2 := signingCertificateV2{
+		Certs: []essCertIDv2{
+			essCertIDv2{
+				HashAlgorithm: pkix.AlgorithmIdentifier{
+					Algorithm:  asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1},
+					Parameters: asn1.NullRawValue,
+				},
+				CertHash: h.Sum(nil),
+				IssuerSerial: issuerAndSerial{
+					IssuerName:   asn1.RawValue{FullBytes: certificate.RawIssuer},
+					SerialNumber: certificate.SerialNumber,
+				},
+			},
+		},
+	}
+	signingCertV2Bytes, err := asn1.Marshal(signingCertificateV2)
+	if err != nil {
+		return nil, err
+	}
+	return signingCertV2Bytes, nil
+}
+
+func generateSignedData(tstInfo []byte, privateKey crypto.PrivateKey, certificate *x509.Certificate) ([]byte, error) {
+	signedData, err := pkcs7.NewSignedData(tstInfo)
+	if err != nil {
+		return nil, err
+	}
+	signedData.SetDigestAlgorithm(pkcs7.OIDDigestAlgorithmSHA256)
+	// signedData.SetEncryptionAlgorithm(pkcs7.OIDEncryptionAlgorithmRSA)
+
+	signingCertV2Bytes, err := populateSigningCertificateV2Ext(certificate)
+	if err != nil {
+		return nil, err
+	}
+
+	err = signedData.AddSigner(certificate, privateKey, pkcs7.SignerInfoConfig{
+		ExtraSignedAttributes: []pkcs7.Attribute{
+			pkcs7.Attribute{
+				Type:  asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 47},
+				Value: asn1.RawContent(signingCertV2Bytes),
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	signature, err := signedData.Finish()
+	if err != nil {
+		return nil, err
+	}
+	return signature, nil
+}
+
+// copied from cryto/x509 package
+// oidNotInExtensions reports whether an extension with the given oid exists in
+// extensions.
+func oidInExtensions(oid asn1.ObjectIdentifier, extensions []pkix.Extension) bool {
+	for _, e := range extensions {
+		if e.Id.Equal(oid) {
+			return true
+		}
+	}
+	return false
 }
