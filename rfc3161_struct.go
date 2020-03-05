@@ -43,16 +43,22 @@ type tstInfo struct {
 	Policy         asn1.RawValue
 	MessageImprint messageImprint
 	SerialNumber   *big.Int
-	Time           time.Time
-	Accuracy       accuracy         `asn1:"optional"`
+	Time           time.Time        `asn1:"generalized"`
+	Accuracy       Accuracy         `asn1:"optional"`
 	Ordering       bool             `asn1:"optional,default:false"`
 	Nonce          *big.Int         `asn1:"optional"`
 	TSA            asn1.RawValue    `asn1:"tag:0,optional"`
 	Extensions     []pkix.Extension `asn1:"tag:1,optional"`
 }
 
-type accuracy struct {
+// Accuracy within TSTInfo
+type Accuracy struct {
 	Seconds      int64 `asn1:"optional"`
 	Milliseconds int64 `asn1:"tag:0,optional"`
 	Microseconds int64 `asn1:"tag:1,optional"`
+}
+
+type qcStatement struct {
+	StatementID   asn1.ObjectIdentifier
+	StatementInfo asn1.RawValue `asn1:"optional"`
 }
