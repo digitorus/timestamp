@@ -309,6 +309,8 @@ func TestCreateResponse(t *testing.T) {
 	nonce := big.NewInt(0)
 	nonce = nonce.SetBytes([]byte{0x1, 0x2, 0x3})
 
+	duration, _ := time.ParseDuration("1s")
+
 	timestamp := Timestamp{
 		HashAlgorithm: crypto.SHA256,
 		HashedMessage: h.Sum(nil),
@@ -316,10 +318,8 @@ func TestCreateResponse(t *testing.T) {
 		Nonce:         nonce,
 		Policy:        asn1.ObjectIdentifier{2, 4, 5, 6},
 		Ordering:      true,
-		Accuracy: Accuracy{
-			Seconds: 1,
-		},
-		Qualified: true,
+		Accuracy:      duration,
+		Qualified:     true,
 	}
 	timestampBytes, err := timestamp.CreateResponse(tsaCert, tsakey)
 	if err != nil {

@@ -28,7 +28,7 @@ type tsaPolicyID asn1.ObjectIdentifier
 // 2.4.2. Response Format
 type response struct {
 	Status         pkiStatusInfo
-	TimeStampToken asn1.RawValue
+	TimeStampToken asn1.RawValue `asn1:"optional"`
 }
 
 type pkiStatusInfo struct {
@@ -44,15 +44,15 @@ type tstInfo struct {
 	MessageImprint messageImprint
 	SerialNumber   *big.Int
 	Time           time.Time        `asn1:"generalized"`
-	Accuracy       Accuracy         `asn1:"optional"`
+	Accuracy       accuracy         `asn1:"optional"`
 	Ordering       bool             `asn1:"optional,default:false"`
 	Nonce          *big.Int         `asn1:"optional"`
 	TSA            asn1.RawValue    `asn1:"tag:0,optional"`
 	Extensions     []pkix.Extension `asn1:"tag:1,optional"`
 }
 
-// Accuracy within TSTInfo
-type Accuracy struct {
+// accuracy within TSTInfo
+type accuracy struct {
 	Seconds      int64 `asn1:"optional"`
 	Milliseconds int64 `asn1:"tag:0,optional"`
 	Microseconds int64 `asn1:"tag:1,optional"`
