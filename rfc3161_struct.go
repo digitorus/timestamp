@@ -33,8 +33,8 @@ type response struct {
 
 type pkiStatusInfo struct {
 	Status       int
-	StatusString string `asn1:"optional"`
-	FailInfo     int    `asn1:"optional"`
+	StatusString string         `asn1:"optional"`
+	FailInfo     asn1.BitString `asn1:"optional"`
 }
 
 // eContent within SignedData is TSTInfo
