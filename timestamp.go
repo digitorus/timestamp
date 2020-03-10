@@ -53,7 +53,7 @@ const (
 	GrantedWithMods int = 1
 
 	// Rejection PKIStatus
-	Rejection int32 = 2
+	Rejection int = 2
 
 	// Waiting PKIStatus
 	Waiting int = 3
@@ -217,7 +217,7 @@ func ParseResponse(bytes []byte) (*Timestamp, error) {
 
 	if resp.Status.Status > 0 {
 		return nil, ParseError(fmt.Sprintf("%s: %s",
-			FailureInfo(resp.Status.FailInfo).String(), resp.Status.StatusString))
+			FailureInfo(int(resp.Status.FailInfo.Bytes[0])).String(), resp.Status.StatusString))
 	}
 
 	if len(resp.TimeStampToken.Bytes) == 0 {
@@ -257,11 +257,14 @@ func Parse(bytes []byte) (*Timestamp, error) {
 		HashedMessage: inf.MessageImprint.HashedMessage,
 		SerialNumber:  inf.SerialNumber,
 		Time:          inf.Time,
-		Accuracy:      inf.Accuracy,
-		Certificates:  p7.Certificates,
-		Nonce:         inf.Nonce,
-		Ordering:      inf.Ordering,
-		Extensions:    inf.Extensions,
+		// Accuracy: time.Duration((time.Second * time.Duration(inf.Accuracy.Seconds)) +
+		// 	(time.Millisecond * time.Duration(inf.Accuracy.Milliseconds)) +
+		// 	(time.Microsecond * time.Duration(inf.Accuracy.Microseconds))),
+		Accuracy:     inf.Accuracy,
+		Certificates: p7.Certificates,
+		Nonce:        inf.Nonce,
+		Ordering:     inf.Ordering,
+		Extensions:   inf.Extensions,
 	}
 
 	ret.HashAlgorithm = getHashAlgorithmFromOID(inf.MessageImprint.HashAlgorithm.Algorithm)
@@ -355,6 +358,21 @@ func (t *Timestamp) CreateResponse(signingCert *x509.Certificate, priv crypto.Si
 			Status: Granted,
 		},
 		TimeStampToken: asn1.RawValue{FullBytes: signature},
+	}
+	tspResponseBytes, err := asn1.Marshal(timestampRes)
+	if err != nil {
+		return nil, err
+	}
+	return tspResponseBytes, nil
+}
+
+//CreateErrorResponse is used to create response other than granted and granted with mod status
+func CreateErrorResponse(pkiStatus int, pkiFailureInfo int) ([]byte, error) {
+	timestampRes := response{
+		Status: pkiStatusInfo{
+			Status:   pkiStatus,
+			FailInfo: asn1.BitString{Bytes: []byte{byte(pkiFailureInfo)}, BitLength: 8},
+		},
 	}
 	tspResponseBytes, err := asn1.Marshal(timestampRes)
 	if err != nil {
