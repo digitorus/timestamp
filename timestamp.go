@@ -175,7 +175,7 @@ type Timestamp struct {
 	HashedMessage []byte
 
 	Time         time.Time
-	Accuracy     Accuracy
+	Accuracy     time.Duration
 	SerialNumber *big.Int
 	Policy       asn1.ObjectIdentifier
 	Ordering     bool
@@ -257,10 +257,9 @@ func Parse(bytes []byte) (*Timestamp, error) {
 		HashedMessage: inf.MessageImprint.HashedMessage,
 		SerialNumber:  inf.SerialNumber,
 		Time:          inf.Time,
-		// Accuracy: time.Duration((time.Second * time.Duration(inf.Accuracy.Seconds)) +
-		// 	(time.Millisecond * time.Duration(inf.Accuracy.Milliseconds)) +
-		// 	(time.Microsecond * time.Duration(inf.Accuracy.Microseconds))),
-		Accuracy:     inf.Accuracy,
+		Accuracy: time.Duration((time.Second * time.Duration(inf.Accuracy.Seconds)) +
+			(time.Millisecond * time.Duration(inf.Accuracy.Milliseconds)) +
+			(time.Microsecond * time.Duration(inf.Accuracy.Microseconds))),
 		Certificates: p7.Certificates,
 		Nonce:        inf.Nonce,
 		Ordering:     inf.Ordering,
@@ -367,7 +366,7 @@ func (t *Timestamp) CreateResponse(signingCert *x509.Certificate, priv crypto.Si
 }
 
 //CreateErrorResponse is used to create response other than granted and granted with mod status
-func CreateErrorResponse(pkiStatus int, pkiFailureInfo int) ([]byte, error) {
+func CreateErrorResponse(pkiStatus int, pkiFailureInfo FailureInfo) ([]byte, error) {
 	timestampRes := response{
 		Status: pkiStatusInfo{
 			Status:   pkiStatus,
@@ -428,8 +427,19 @@ func (t *Timestamp) populateTSTInfo(messageImprint messageImprint, policyOID asn
 	if t.Nonce != nil {
 		tstInfo.Nonce = t.Nonce
 	}
-	if t.Accuracy != (Accuracy{}) {
-		tstInfo.Accuracy = t.Accuracy
+	if t.Accuracy != 0 {
+		var accuracy accuracy
+
+		seconds := t.Accuracy.Truncate(time.Second)
+		accuracy.Seconds = int64(seconds)
+		ms := (t.Accuracy - seconds).Truncate(time.Millisecond)
+		if ms != 0 {
+			accuracy.Milliseconds = int64(ms)
+		}
+		microSeconds := (t.Accuracy - seconds - ms).Truncate(time.Microsecond)
+		if microSeconds != 0 {
+			accuracy.Microseconds = int64(microSeconds)
+		}
 	}
 	if len(t.ExtraExtensions) != 0 {
 		tstInfo.Extensions = t.ExtraExtensions
