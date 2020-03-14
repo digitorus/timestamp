@@ -1,4 +1,4 @@
-module github.com/timestamp
+module github.com/digitorus/timestamp
 
 go 1.14
 
