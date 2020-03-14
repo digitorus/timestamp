@@ -148,10 +148,9 @@ func TestParseResponse(t *testing.T) {
 				t.Errorf("resp.Time: got %v, want %v", resp.Time, tc.time)
 			}
 
-			// FIXME:
-			// if resp.Accuracy != tc.accuracy {
-			// 	t.Errorf("resp.Accuracy: got %v, want %v", resp.Accuracy, tc.accuracy)
-			// }
+			if resp.Accuracy != tc.accuracy {
+				t.Errorf("resp.Accuracy: got %v, want %v", resp.Accuracy, tc.accuracy)
+			}
 
 			if tc.certificates && len(resp.Certificates) == 0 {
 				t.Errorf("resp.Certificates: got %v, want %v", len(resp.Certificates), tc.certificates)
@@ -182,10 +181,9 @@ func TestParse(t *testing.T) {
 		t.Errorf("ts.Time: got %v, want %v", ts.Time, tsTime)
 	}
 
-	// FIXME:
-	// if ts.Accuracy != time.Second {
-	// 	t.Errorf("ts.Accuracy: got %v, want %v", ts.Accuracy, time.Second)
-	// }
+	if ts.Accuracy != time.Second {
+		t.Errorf("ts.Accuracy: got %v, want %v", ts.Accuracy, time.Second)
+	}
 }
 
 func TestMarshalRequest(t *testing.T) {

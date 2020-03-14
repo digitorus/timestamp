@@ -499,7 +499,6 @@ func generateSignedData(tstInfo []byte, privateKey crypto.PrivateKey, certificat
 		return nil, err
 	}
 	signedData.SetDigestAlgorithm(pkcs7.OIDDigestAlgorithmSHA256)
-	// signedData.SetEncryptionAlgorithm(pkcs7.OIDEncryptionAlgorithmRSA)
 
 	signingCertV2Bytes, err := populateSigningCertificateV2Ext(certificate)
 	if err != nil {
