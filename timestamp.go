@@ -105,6 +105,10 @@ type Request struct {
 	// and optionally any other certificates of the chain as part of the response.
 	Certificates bool
 
+	TSAPolicyOID asn1.ObjectIdentifier
+
+	Nonce *big.Int
+
 	// Extensions contains raw X.509 extensions from the Extensions field of the
 	// Time-Stamp request. When parsing requests, this can be used to extract
 	// non-critical extensions that are not parsed by this package. When
@@ -146,13 +150,15 @@ func ParseRequest(bytes []byte) (*Request, error) {
 		HashAlgorithm: hashFunc,
 		HashedMessage: req.MessageImprint.HashedMessage,
 		Certificates:  req.CertReq,
+		Nonce:         req.Nonce,
+		TSAPolicyOID:  req.ReqPolicy,
 		Extensions:    req.Extensions,
 	}, nil
 }
 
 // Marshal marshals the Time-Stamp request to ASN.1 DER encoded form.
 func (req *Request) Marshal() ([]byte, error) {
-	return asn1.Marshal(request{
+	request := request{
 		Version: 1,
 		MessageImprint: messageImprint{
 			HashAlgorithm: pkix.AlgorithmIdentifier{
@@ -165,7 +171,19 @@ func (req *Request) Marshal() ([]byte, error) {
 		},
 		CertReq:    req.Certificates,
 		Extensions: req.ExtraExtensions,
-	})
+	}
+
+	if req.TSAPolicyOID != nil {
+		request.ReqPolicy = req.TSAPolicyOID
+	}
+	if req.Nonce != nil {
+		request.Nonce = req.Nonce
+	}
+	reqBytes, err := asn1.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+	return reqBytes, nil
 }
 
 // Timestamp represents an Time-Stamp. See:
@@ -291,6 +309,10 @@ type RequestOptions struct {
 
 	// Certificates sets Request.Certificates
 	Certificates bool
+
+	TSAPolicyOID asn1.ObjectIdentifier
+
+	Nonce *big.Int
 }
 
 func (opts *RequestOptions) hash() crypto.Hash {
@@ -324,11 +346,15 @@ func CreateRequest(r io.Reader, opts *RequestOptions) ([]byte, error) {
 		HashAlgorithm: opts.hash(),
 		HashedMessage: h.Sum(nil),
 	}
-
 	if opts != nil {
 		req.Certificates = opts.Certificates
 	}
-
+	if opts != nil && opts.TSAPolicyOID != nil {
+		req.TSAPolicyOID = opts.TSAPolicyOID
+	}
+	if opts != nil && opts.Nonce != nil {
+		req.Nonce = opts.Nonce
+	}
 	return req.Marshal()
 }
 

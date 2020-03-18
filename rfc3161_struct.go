@@ -12,18 +12,16 @@ import (
 type request struct {
 	Version        int
 	MessageImprint messageImprint
-	ReqPolicy      tsaPolicyID      `asn1:"optional"`
-	Nonce          *big.Int         `asn1:"optional"`
-	CertReq        bool             `asn1:"optional,default:false"`
-	Extensions     []pkix.Extension `asn1:"tag:0,optional"`
+	ReqPolicy      asn1.ObjectIdentifier `asn1:"optional"`
+	Nonce          *big.Int              `asn1:"optional"`
+	CertReq        bool                  `asn1:"optional,default:false"`
+	Extensions     []pkix.Extension      `asn1:"tag:0,optional"`
 }
 
 type messageImprint struct {
 	HashAlgorithm pkix.AlgorithmIdentifier
 	HashedMessage []byte
 }
-
-type tsaPolicyID asn1.ObjectIdentifier
 
 // 2.4.2. Response Format
 type response struct {
