@@ -204,6 +204,10 @@ func TestMarshalRequest(t *testing.T) {
 
 func TestCreateRequest(t *testing.T) {
 	var testHashes = []crypto.Hash{crypto.SHA1, crypto.SHA256, crypto.SHA384, crypto.SHA512}
+
+	nonce := big.NewInt(0)
+	nonce = nonce.SetBytes([]byte{0x1, 0x2, 0x3})
+
 	for _, th := range testHashes {
 		t.Run(fmt.Sprintf("%d", th), func(t *testing.T) {
 			msg := "Content to by timestamped"
@@ -213,7 +217,10 @@ func TestCreateRequest(t *testing.T) {
 			hashedMsg := h.Sum(nil)
 
 			req, err := CreateRequest(strings.NewReader(msg), &RequestOptions{
-				Hash: th,
+				Hash:         th,
+				Nonce:        nonce,
+				TSAPolicyOID: asn1.ObjectIdentifier{2, 5, 6, 7},
+				Certificates: true,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -230,6 +237,18 @@ func TestCreateRequest(t *testing.T) {
 
 			if !bytes.Equal(reqCheck.HashedMessage, hashedMsg) {
 				t.Errorf("reqCheck.HashedMessage: got %x, want %x", reqCheck.HashedMessage, hashedMsg)
+			}
+
+			if reqCheck.Nonce.Cmp(nonce) != 0 {
+				t.Errorf("reqCheck.Nonce: got %x, want %x", reqCheck.Nonce, nonce)
+			}
+
+			if reqCheck.Certificates != true {
+				t.Errorf("reqCheck.Certificates: got %t, want %t", reqCheck.Certificates, true)
+			}
+
+			if !reqCheck.TSAPolicyOID.Equal(asn1.ObjectIdentifier{2, 5, 6, 7}) {
+				t.Errorf("reqCheck.TSAPolicyOID: got %x, want %x", reqCheck.TSAPolicyOID, asn1.ObjectIdentifier{2, 5, 6, 7})
 			}
 		})
 	}
