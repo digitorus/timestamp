@@ -105,8 +105,12 @@ type Request struct {
 	// and optionally any other certificates of the chain as part of the response.
 	Certificates bool
 
+	// The TSAPolicyOID field, if provided, indicates the TSA policy under
+	// which the TimeStampToken SHOULD be provided
 	TSAPolicyOID asn1.ObjectIdentifier
 
+	// The nonce, if provided, allows the client to verify the timeliness of
+	// the response.
 	Nonce *big.Int
 
 	// Extensions contains raw X.509 extensions from the Extensions field of the
@@ -310,8 +314,12 @@ type RequestOptions struct {
 	// Certificates sets Request.Certificates
 	Certificates bool
 
+	// The TSAPolicyOID field, if provided, indicates the TSA policy under
+	// which the TimeStampToken SHOULD be provided
 	TSAPolicyOID asn1.ObjectIdentifier
 
+	// The nonce, if provided, allows the client to verify the timeliness of
+	// the response.
 	Nonce *big.Int
 }
 
