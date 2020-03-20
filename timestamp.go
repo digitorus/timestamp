@@ -206,6 +206,9 @@ type Timestamp struct {
 
 	Certificates []*x509.Certificate
 
+	// If set to true, includes TSA certificate in timestamp response
+	IncludeTSACertificate bool
+
 	// Extensions contains raw X.509 extensions from the Extensions field of the
 	// Time-Stamp. When parsing time-stamps, this can be used to extract
 	// non-critical extensions that are not parsed by this package. When
@@ -382,7 +385,7 @@ func (t *Timestamp) CreateResponse(signingCert *x509.Certificate, priv crypto.Si
 	if err != nil {
 		return nil, err
 	}
-	signature, err := generateSignedData(tstInfo, priv, signingCert)
+	signature, err := t.generateSignedData(tstInfo, priv, signingCert)
 	if err != nil {
 		return nil, err
 	}
@@ -527,8 +530,8 @@ func populateSigningCertificateV2Ext(certificate *x509.Certificate) ([]byte, err
 	return signingCertV2Bytes, nil
 }
 
-func generateSignedData(tstInfo []byte, privateKey crypto.PrivateKey, certificate *x509.Certificate) ([]byte, error) {
-	signedData, err := pkcs7.NewSignedData(tstInfo)
+func (t *Timestamp) generateSignedData(tstInfo []byte, privateKey crypto.PrivateKey, certificate *x509.Certificate) ([]byte, error) {
+	signedData, err := pkcs7.NewSignedDataWithContentType(asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 1, 4}, tstInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -538,15 +541,25 @@ func generateSignedData(tstInfo []byte, privateKey crypto.PrivateKey, certificat
 	if err != nil {
 		return nil, err
 	}
-
-	err = signedData.AddSigner(certificate, privateKey, pkcs7.SignerInfoConfig{
-		ExtraSignedAttributes: []pkcs7.Attribute{
-			pkcs7.Attribute{
-				Type:  asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 47},
-				Value: asn1.RawContent(signingCertV2Bytes),
+	if t.IncludeTSACertificate {
+		err = signedData.AddSigner(certificate, privateKey, pkcs7.SignerInfoConfig{
+			ExtraSignedAttributes: []pkcs7.Attribute{
+				pkcs7.Attribute{
+					Type:  asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 47},
+					Value: asn1.RawContent(signingCertV2Bytes),
+				},
 			},
-		},
-	})
+		})
+	} else {
+		err = signedData.AddSignerNoChain(certificate, privateKey, pkcs7.SignerInfoConfig{
+			ExtraSignedAttributes: []pkcs7.Attribute{
+				pkcs7.Attribute{
+					Type:  asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 47},
+					Value: asn1.RawContent(signingCertV2Bytes),
+				},
+			},
+		})
+	}
 	if err != nil {
 		return nil, err
 	}
