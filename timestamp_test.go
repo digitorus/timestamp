@@ -314,7 +314,7 @@ func ExampleParseRequest() {
 	// Output: 51a3620a3b62ffaff41a434e932223b31bc69e86490c365fa1186033904f1132
 }
 
-func TestCreateResponse(t *testing.T) {
+func TestCreateResponseWithIncludeTSACertificate(t *testing.T) {
 	tsakey := getTSARSAKey()
 	tsaCert := getTSACert()
 
@@ -329,14 +329,15 @@ func TestCreateResponse(t *testing.T) {
 	duration, _ := time.ParseDuration("1s")
 
 	timestamp := Timestamp{
-		HashAlgorithm: crypto.SHA256,
-		HashedMessage: h.Sum(nil),
-		Time:          genTime,
-		Nonce:         nonce,
-		Policy:        asn1.ObjectIdentifier{2, 4, 5, 6},
-		Ordering:      true,
-		Accuracy:      duration,
-		Qualified:     true,
+		HashAlgorithm:     crypto.SHA256,
+		HashedMessage:     h.Sum(nil),
+		Time:              genTime,
+		Nonce:             nonce,
+		Policy:            asn1.ObjectIdentifier{2, 4, 5, 6},
+		Ordering:          true,
+		Accuracy:          duration,
+		Qualified:         true,
+		AddTSACertificate: true,
 	}
 	timestampBytes, err := timestamp.CreateResponse(tsaCert, tsakey)
 	if err != nil {
@@ -356,6 +357,60 @@ func TestCreateResponse(t *testing.T) {
 
 	if !timestampRes.Qualified {
 		t.Errorf("got %t: expected: %t", timestampRes.Qualified, true)
+	}
+
+	if !timestampRes.AddTSACertificate {
+		t.Error("TSA certificate must be included in timestamp response")
+	}
+}
+
+func TestCreateResponseWithNoTSACertificate(t *testing.T) {
+	tsakey := getTSARSAKey()
+	tsaCert := getTSACert()
+
+	h := sha256.New()
+	h.Write([]byte("Hello World"))
+
+	genTime := time.Now().UTC()
+
+	nonce := big.NewInt(0)
+	nonce = nonce.SetBytes([]byte{0x1, 0x2, 0x3})
+
+	duration, _ := time.ParseDuration("1s")
+
+	timestamp := Timestamp{
+		HashAlgorithm:     crypto.SHA256,
+		HashedMessage:     h.Sum(nil),
+		Time:              genTime,
+		Nonce:             nonce,
+		Policy:            asn1.ObjectIdentifier{2, 4, 5, 6},
+		Ordering:          true,
+		Accuracy:          duration,
+		Qualified:         false,
+		AddTSACertificate: false,
+	}
+	timestampBytes, err := timestamp.CreateResponse(tsaCert, tsakey)
+	if err != nil {
+		t.Errorf("unable to generate time stamp response: %s", err.Error())
+	}
+	timestampRes, err := ParseResponse(timestampBytes)
+	if err != nil {
+		t.Errorf("unable to parse time stamp response: %s", err.Error())
+	}
+
+	if timestampRes.HashAlgorithm.HashFunc() != crypto.SHA256 {
+		t.Errorf("expected hash algorithm is SHA256")
+	}
+	if len(timestampRes.HashedMessage) != 32 {
+		t.Errorf("got %d: expected: %d", len(timestampRes.HashedMessage), 32)
+	}
+
+	if timestampRes.Qualified {
+		t.Errorf("got %t: expected: %t", timestampRes.Qualified, true)
+	}
+
+	if timestampRes.AddTSACertificate {
+		t.Error("TSA certificate must not be included in timestamp response")
 	}
 }
 

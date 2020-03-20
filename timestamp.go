@@ -207,7 +207,7 @@ type Timestamp struct {
 	Certificates []*x509.Certificate
 
 	// If set to true, includes TSA certificate in timestamp response
-	IncludeTSACertificate bool
+	AddTSACertificate bool
 
 	// Extensions contains raw X.509 extensions from the Extensions field of the
 	// Time-Stamp. When parsing time-stamps, this can be used to extract
@@ -258,6 +258,7 @@ func ParseResponse(bytes []byte) (*Timestamp, error) {
 // Invalid signatures or parse failures will result in a ParseError. Error
 // responses will result in a ResponseError.
 func Parse(bytes []byte) (*Timestamp, error) {
+	var addTSACertificate bool
 	p7, err := pkcs7.Parse(bytes)
 	if err != nil {
 		return nil, err
@@ -267,6 +268,9 @@ func Parse(bytes []byte) (*Timestamp, error) {
 		if err = p7.Verify(); err != nil {
 			return nil, err
 		}
+		addTSACertificate = true
+	} else {
+		addTSACertificate = false
 	}
 
 	var inf tstInfo
@@ -285,10 +289,11 @@ func Parse(bytes []byte) (*Timestamp, error) {
 		Accuracy: time.Duration((time.Second * time.Duration(inf.Accuracy.Seconds)) +
 			(time.Millisecond * time.Duration(inf.Accuracy.Milliseconds)) +
 			(time.Microsecond * time.Duration(inf.Accuracy.Microseconds))),
-		Certificates: p7.Certificates,
-		Nonce:        inf.Nonce,
-		Ordering:     inf.Ordering,
-		Extensions:   inf.Extensions,
+		Certificates:      p7.Certificates,
+		Nonce:             inf.Nonce,
+		AddTSACertificate: addTSACertificate,
+		Ordering:          inf.Ordering,
+		Extensions:        inf.Extensions,
 	}
 
 	ret.HashAlgorithm = getHashAlgorithmFromOID(inf.MessageImprint.HashAlgorithm.Algorithm)
@@ -541,7 +546,7 @@ func (t *Timestamp) generateSignedData(tstInfo []byte, privateKey crypto.Private
 	if err != nil {
 		return nil, err
 	}
-	if t.IncludeTSACertificate {
+	if t.AddTSACertificate {
 		err = signedData.AddSigner(certificate, privateKey, pkcs7.SignerInfoConfig{
 			ExtraSignedAttributes: []pkcs7.Attribute{
 				pkcs7.Attribute{
