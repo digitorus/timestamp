@@ -1,4 +1,4 @@
-# certlint
+# RFC3161 Time-Stamp Protocol (TSP) package for Go
 
 [![Build Status](https://travis-ci.org/digitorus/timestamp.svg?branch=master)](https://travis-ci.org/digitorus/timestamp)
 [![Go Report Card](https://goreportcard.com/badge/github.com/digitorus/timestamp)](https://goreportcard.com/report/github.com/digitorus/timestamp)
