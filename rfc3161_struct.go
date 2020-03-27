@@ -38,7 +38,7 @@ type pkiStatusInfo struct {
 // eContent within SignedData is TSTInfo
 type tstInfo struct {
 	Version        int
-	Policy         asn1.RawValue
+	Policy         asn1.ObjectIdentifier
 	MessageImprint messageImprint
 	SerialNumber   *big.Int
 	Time           time.Time        `asn1:"generalized"`

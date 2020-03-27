@@ -343,6 +343,11 @@ func TestCreateResponseWithIncludeTSACertificate(t *testing.T) {
 	if err != nil {
 		t.Errorf("unable to generate time stamp response: %s", err.Error())
 	}
+
+	// To verify the reponse using OpenSSL
+	// openssl ts -reply -in timestamp.tsr -text
+	//_ = ioutil.WriteFile("timestamp.tsr", timestampBytes, 0644)
+
 	timestampRes, err := ParseResponse(timestampBytes)
 	if err != nil {
 		t.Errorf("unable to parse time stamp response: %s", err.Error())

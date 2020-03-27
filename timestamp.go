@@ -284,15 +284,16 @@ func Parse(bytes []byte) (*Timestamp, error) {
 
 	ret := &Timestamp{
 		HashedMessage: inf.MessageImprint.HashedMessage,
-		SerialNumber:  inf.SerialNumber,
 		Time:          inf.Time,
 		Accuracy: time.Duration((time.Second * time.Duration(inf.Accuracy.Seconds)) +
 			(time.Millisecond * time.Duration(inf.Accuracy.Milliseconds)) +
 			(time.Microsecond * time.Duration(inf.Accuracy.Microseconds))),
-		Certificates:      p7.Certificates,
-		Nonce:             inf.Nonce,
-		AddTSACertificate: addTSACertificate,
+		SerialNumber:      inf.SerialNumber,
+		Policy:            inf.Policy,
 		Ordering:          inf.Ordering,
+		Nonce:             inf.Nonce,
+		Certificates:      p7.Certificates,
+		AddTSACertificate: addTSACertificate,
 		Extensions:        inf.Extensions,
 	}
 
@@ -300,12 +301,6 @@ func Parse(bytes []byte) (*Timestamp, error) {
 	if ret.HashAlgorithm == crypto.Hash(0) {
 		return nil, ParseError("Time-Stamp response uses unknown hash function")
 	}
-
-	var policyOID asn1.ObjectIdentifier
-	if len(inf.Policy.FullBytes) != 0 {
-		asn1.Unmarshal(inf.Policy.FullBytes, &policyOID)
-	}
-	ret.Policy = policyOID
 
 	if oidInExtensions(asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 3}, inf.Extensions) {
 		ret.Qualified = true
@@ -445,25 +440,17 @@ func generateTSASerialNumber() (*big.Int, error) {
 }
 
 func (t *Timestamp) populateTSTInfo(messageImprint messageImprint, policyOID asn1.ObjectIdentifier, tsaSerialNumber *big.Int, tsaCert *x509.Certificate) ([]byte, error) {
-	policyOIDBytes, err := asn1.Marshal(policyOID)
-	if err != nil {
-		return nil, err
-	}
-	tsaNameBytes, err := asn1.Marshal(tsaCert.Subject.ToRDNSequence())
-	if err != nil {
-		return nil, err
-	}
-	dirGeneralName, err := asn1.Marshal(asn1.RawValue{Tag: 4, Class: 2, IsCompound: true, Bytes: tsaNameBytes})
+	dirGeneralName, err := asn1.Marshal(asn1.RawValue{Tag: 4, Class: 2, IsCompound: true, Bytes: tsaCert.RawSubject})
 	if err != nil {
 		return nil, err
 	}
 	tstInfo := tstInfo{
 		Version:        1,
-		Policy:         asn1.RawValue{FullBytes: policyOIDBytes},
+		Policy:         policyOID,
 		MessageImprint: messageImprint,
 		SerialNumber:   tsaSerialNumber,
-		TSA:            asn1.RawValue{Tag: 0, Class: 2, IsCompound: true, Bytes: dirGeneralName},
 		Time:           t.Time,
+		TSA:            asn1.RawValue{Tag: 0, Class: 2, IsCompound: true, Bytes: dirGeneralName},
 		Ordering:       t.Ordering,
 	}
 	if t.Nonce != nil {
