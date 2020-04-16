@@ -360,6 +360,10 @@ func TestCreateResponseWithIncludeTSACertificate(t *testing.T) {
 		t.Errorf("got %d: expected: %d", len(timestampRes.HashedMessage), 32)
 	}
 
+	if timestampRes.Accuracy != duration {
+		t.Errorf("got accuracy %s: expected: %s", timestampRes.Accuracy, duration)
+	}
+
 	if !timestampRes.Qualified {
 		t.Errorf("got %t: expected: %t", timestampRes.Qualified, true)
 	}

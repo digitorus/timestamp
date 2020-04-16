@@ -457,23 +457,20 @@ func (t *Timestamp) populateTSTInfo(messageImprint messageImprint, policyOID asn
 		tstInfo.Nonce = t.Nonce
 	}
 	if t.Accuracy != 0 {
-		seconds := t.Accuracy.Truncate(time.Second)
-		tstInfo.Accuracy.Seconds = int64(seconds)
-		ms := (t.Accuracy - seconds).Truncate(time.Millisecond)
-		if ms != 0 {
-			tstInfo.Accuracy.Milliseconds = int64(ms)
-		}
-		microSeconds := (t.Accuracy - seconds - ms).Truncate(time.Microsecond)
-		if microSeconds != 0 {
-			tstInfo.Accuracy.Microseconds = int64(microSeconds)
-		}
-		// Round up to 1 microsecond if accuracy is lower than 1 microsecond but greater than 0 nanosecond
-		if t.Accuracy.Nanoseconds() > int64(0) &&
-			tstInfo.Accuracy.Seconds == 0 &&
-			tstInfo.Accuracy.Milliseconds == 0 &&
-			tstInfo.Accuracy.Microseconds == 0 {
-
+		if t.Accuracy < time.Microsecond {
+			// Round up to 1 microsecond if accuracy is lower than 1 microsecond but greater than 0 nanosecond
 			tstInfo.Accuracy.Microseconds = 1
+		} else {
+			seconds := t.Accuracy.Truncate(time.Second)
+			tstInfo.Accuracy.Seconds = int64(seconds.Seconds())
+			ms := (t.Accuracy - seconds).Truncate(time.Millisecond)
+			if ms != 0 {
+				tstInfo.Accuracy.Milliseconds = int64(ms.Milliseconds())
+			}
+			microSeconds := (t.Accuracy - seconds - ms).Truncate(time.Microsecond)
+			if microSeconds != 0 {
+				tstInfo.Accuracy.Microseconds = int64(microSeconds.Microseconds())
+			}
 		}
 	}
 	if len(t.ExtraExtensions) != 0 {
