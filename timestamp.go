@@ -469,6 +469,14 @@ func (t *Timestamp) populateTSTInfo(messageImprint messageImprint, policyOID asn
 		if microSeconds != 0 {
 			accuracy.Microseconds = int64(microSeconds)
 		}
+		// Round up to 1 microsecond if accuracy is lower than 1 microsecond but greater than 0 nanosecond
+		if t.Accuracy.Nanoseconds() > int64(0) &&
+			accuracy.Seconds == 0 &&
+			accuracy.Milliseconds == 0 &&
+			accuracy.Microseconds == 0 {
+
+			accuracy.Microseconds = 1
+		}
 	}
 	if len(t.ExtraExtensions) != 0 {
 		tstInfo.Extensions = t.ExtraExtensions
