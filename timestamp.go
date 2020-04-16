@@ -457,25 +457,23 @@ func (t *Timestamp) populateTSTInfo(messageImprint messageImprint, policyOID asn
 		tstInfo.Nonce = t.Nonce
 	}
 	if t.Accuracy != 0 {
-		var accuracy accuracy
-
 		seconds := t.Accuracy.Truncate(time.Second)
-		accuracy.Seconds = int64(seconds)
+		tstInfo.Accuracy.Seconds = int64(seconds)
 		ms := (t.Accuracy - seconds).Truncate(time.Millisecond)
 		if ms != 0 {
-			accuracy.Milliseconds = int64(ms)
+			tstInfo.Accuracy.Milliseconds = int64(ms)
 		}
 		microSeconds := (t.Accuracy - seconds - ms).Truncate(time.Microsecond)
 		if microSeconds != 0 {
-			accuracy.Microseconds = int64(microSeconds)
+			tstInfo.Accuracy.Microseconds = int64(microSeconds)
 		}
 		// Round up to 1 microsecond if accuracy is lower than 1 microsecond but greater than 0 nanosecond
 		if t.Accuracy.Nanoseconds() > int64(0) &&
-			accuracy.Seconds == 0 &&
-			accuracy.Milliseconds == 0 &&
-			accuracy.Microseconds == 0 {
+			tstInfo.Accuracy.Seconds == 0 &&
+			tstInfo.Accuracy.Milliseconds == 0 &&
+			tstInfo.Accuracy.Microseconds == 0 {
 
-			accuracy.Microseconds = 1
+			tstInfo.Accuracy.Microseconds = 1
 		}
 	}
 	if len(t.ExtraExtensions) != 0 {
