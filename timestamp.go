@@ -5,7 +5,6 @@ package timestamp
 import (
 	"crypto"
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -477,11 +476,9 @@ func (t *Timestamp) populateTSTInfo(messageImprint messageImprint, policyOID asn
 		tstInfo.Extensions = t.ExtraExtensions
 	}
 	if t.Qualified && !oidInExtensions(asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 3}, t.ExtraExtensions) {
-		qcStatements := []qcStatement{
-			qcStatement{
-				StatementID: asn1.ObjectIdentifier{0, 4, 0, 19422, 1, 1},
-			},
-		}
+		qcStatements := []qcStatement{{
+			StatementID: asn1.ObjectIdentifier{0, 4, 0, 19422, 1, 1},
+		}}
 		asn1QcStats, err := asn1.Marshal(qcStatements)
 		if err != nil {
 			return nil, err
@@ -499,24 +496,38 @@ func (t *Timestamp) populateTSTInfo(messageImprint messageImprint, policyOID asn
 	return tstInfoBytes, nil
 }
 
-func populateSigningCertificateV2Ext(certificate *x509.Certificate) ([]byte, error) {
-	h := sha256.New()
+func (t *Timestamp) populateSigningCertificateV2Ext(certificate *x509.Certificate) ([]byte, error) {
+	if !t.HashAlgorithm.Available() {
+		return nil, x509.ErrUnsupportedAlgorithm
+	}
+	if t.HashAlgorithm.HashFunc() == crypto.SHA1 {
+		return nil, fmt.Errorf("for SHA1 usae ESSCertID instead of ESSCertIDv2")
+	}
+
+	h := t.HashAlgorithm.HashFunc().New()
 	h.Write(certificate.Raw)
 
+	var hashAlg pkix.AlgorithmIdentifier
+
+	// HashAlgorithm defaults to SHA256
+	if t.HashAlgorithm.HashFunc() != crypto.SHA256 {
+		hashAlg = pkix.AlgorithmIdentifier{
+			Algorithm:  hashOIDs[t.HashAlgorithm.HashFunc()],
+			Parameters: asn1.NullRawValue,
+		}
+	}
+
 	signingCertificateV2 := signingCertificateV2{
-		Certs: []essCertIDv2{
-			essCertIDv2{
-				HashAlgorithm: pkix.AlgorithmIdentifier{
-					Algorithm:  asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1},
-					Parameters: asn1.NullRawValue,
+		Certs: []essCertIDv2{{
+			HashAlgorithm: hashAlg,
+			CertHash:      h.Sum(nil),
+			IssuerSerial: issuerAndSerial{
+				IssuerName: generalNames{
+					Name: asn1.RawValue{Tag: 4, Class: 2, IsCompound: true, Bytes: certificate.RawIssuer},
 				},
-				CertHash: h.Sum(nil),
-				IssuerSerial: issuerAndSerial{
-					IssuerName:   asn1.RawValue{FullBytes: certificate.RawIssuer},
-					SerialNumber: certificate.SerialNumber,
-				},
+				SerialNumber: certificate.SerialNumber,
 			},
-		},
+		}},
 	}
 	signingCertV2Bytes, err := asn1.Marshal(signingCertificateV2)
 	if err != nil {
@@ -532,32 +543,28 @@ func (t *Timestamp) generateSignedData(tstInfo []byte, privateKey crypto.Private
 	}
 	signedData.SetDigestAlgorithm(pkcs7.OIDDigestAlgorithmSHA256)
 
-	signingCertV2Bytes, err := populateSigningCertificateV2Ext(certificate)
+	signingCertV2Bytes, err := t.populateSigningCertificateV2Ext(certificate)
 	if err != nil {
 		return nil, err
+	}
+
+	signerInfoConfig := pkcs7.SignerInfoConfig{
+		ExtraSignedAttributes: []pkcs7.Attribute{
+			pkcs7.Attribute{
+				Type:  asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 47},
+				Value: asn1.RawValue{FullBytes: signingCertV2Bytes},
+			},
+		},
 	}
 	if t.AddTSACertificate {
-		err = signedData.AddSigner(certificate, privateKey, pkcs7.SignerInfoConfig{
-			ExtraSignedAttributes: []pkcs7.Attribute{
-				pkcs7.Attribute{
-					Type:  asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 47},
-					Value: asn1.RawContent(signingCertV2Bytes),
-				},
-			},
-		})
+		err = signedData.AddSigner(certificate, privateKey, signerInfoConfig)
 	} else {
-		err = signedData.AddSignerNoChain(certificate, privateKey, pkcs7.SignerInfoConfig{
-			ExtraSignedAttributes: []pkcs7.Attribute{
-				pkcs7.Attribute{
-					Type:  asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 47},
-					Value: asn1.RawContent(signingCertV2Bytes),
-				},
-			},
-		})
+		err = signedData.AddSignerNoChain(certificate, privateKey, signerInfoConfig)
 	}
 	if err != nil {
 		return nil, err
 	}
+
 	signature, err := signedData.Finish()
 	if err != nil {
 		return nil, err

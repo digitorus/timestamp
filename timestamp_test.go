@@ -346,7 +346,7 @@ func TestCreateResponseWithIncludeTSACertificate(t *testing.T) {
 
 	// To verify the reponse using OpenSSL
 	// openssl ts -reply -in timestamp.tsr -text
-	//_ = ioutil.WriteFile("timestamp.tsr", timestampBytes, 0644)
+	// _ = ioutil.WriteFile("timestamp.tsr", timestampBytes, 0644)
 
 	timestampRes, err := ParseResponse(timestampBytes)
 	if err != nil {

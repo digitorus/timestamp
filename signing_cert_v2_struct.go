@@ -7,12 +7,16 @@ import (
 )
 
 type issuerAndSerial struct {
-	IssuerName   asn1.RawValue
+	IssuerName   generalNames
 	SerialNumber *big.Int
 }
 
+type generalNames struct {
+	Name asn1.RawValue `asn1:"optional,tag:4"`
+}
+
 type essCertIDv2 struct {
-	HashAlgorithm pkix.AlgorithmIdentifier
+	HashAlgorithm pkix.AlgorithmIdentifier `asn1:"optional"` // default sha256
 	CertHash      []byte
 	IssuerSerial  issuerAndSerial `asn1:"optional"`
 }
