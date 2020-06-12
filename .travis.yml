@@ -2,7 +2,6 @@ sudo: false
 language: go
 go:
   - 1.x
-  - master
 
 before_install:
   - go get -t -v ./...
