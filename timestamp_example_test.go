@@ -14,6 +14,7 @@ import (
 
 // ExampleCreateRequest_ParseResponse demonstrates the creation of a time-stamp request, sending
 // it to the server and parsing the response.
+// nolint: govet
 func ExampleCreateRequest_ParseResponse() {
 	tsq, err := timestamp.CreateRequest(strings.NewReader("ExampleCreateRequestParseResponse"), &timestamp.RequestOptions{
 		Hash:         crypto.SHA256,

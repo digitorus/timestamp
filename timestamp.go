@@ -349,7 +349,10 @@ func CreateRequest(r io.Reader, opts *RequestOptions) ([]byte, error) {
 			break
 		}
 
-		h.Write(b[:n])
+		_, err = h.Write(b[:n])
+		if err != nil {
+			return nil, fmt.Errorf("failed to create hash")
+		}
 	}
 
 	req := &Request{
@@ -505,7 +508,10 @@ func (t *Timestamp) populateSigningCertificateV2Ext(certificate *x509.Certificat
 	}
 
 	h := t.HashAlgorithm.HashFunc().New()
-	h.Write(certificate.Raw)
+	_, err := h.Write(certificate.Raw)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create hash")
+	}
 
 	var hashAlg pkix.AlgorithmIdentifier
 
@@ -550,7 +556,7 @@ func (t *Timestamp) generateSignedData(tstInfo []byte, privateKey crypto.Private
 
 	signerInfoConfig := pkcs7.SignerInfoConfig{
 		ExtraSignedAttributes: []pkcs7.Attribute{
-			pkcs7.Attribute{
+			{
 				Type:  asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 47},
 				Value: asn1.RawValue{FullBytes: signingCertV2Bytes},
 			},

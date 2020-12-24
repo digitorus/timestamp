@@ -62,7 +62,7 @@ var testCases = []testData{
 		request:       reqNonce,
 		response:      respNonce,
 		certificates:  true,
-		nonce:         nil,
+		nonce:         big.NewInt(0).SetBytes([]byte{0x9, 0x2e, 0xf1, 0x9f, 0xfb, 0x5d, 0x2a, 0xe8}),
 		time:          time.Date(2017, 4, 19, 6, 29, 53, 0, time.UTC),
 		accuracy:      time.Second,
 		hashedMessage: hashedMessage,
@@ -84,7 +84,7 @@ var testCases = []testData{
 		request:       reqNoCert,
 		response:      respNoCert,
 		certificates:  false,
-		nonce:         nil,
+		nonce:         big.NewInt(0).SetBytes([]byte{0xb1, 0xfc, 0x81, 0xde, 0xc9, 0x57, 0x49, 0xd9}),
 		time:          time.Date(2017, 4, 19, 6, 32, 43, 0, time.UTC),
 		accuracy:      time.Second,
 		hashedMessage: hashedMessage,
@@ -110,6 +110,10 @@ func TestParseRequest(t *testing.T) {
 
 			if !bytes.Equal(req.HashedMessage, tc.hashedMessage) {
 				t.Errorf("req.HashedMessage: got %x, want %x", req.HashedMessage, tc.hashedMessage)
+			}
+
+			if (tc.nonce != nil && tc.nonce.CmpAbs(req.Nonce) != 0) || (req.Nonce != nil && tc.nonce == nil) {
+				t.Errorf("req.Nonce: got %v, want %v", req.Nonce, tc.nonce)
 			}
 
 			if req.HashAlgorithm != tc.hashAlgorithm {
@@ -213,7 +217,10 @@ func TestCreateRequest(t *testing.T) {
 			msg := "Content to by timestamped"
 
 			h := th.New()
-			h.Write([]byte(msg))
+			_, err := h.Write([]byte(msg))
+			if err != nil {
+				t.Fatal(err)
+			}
 			hashedMsg := h.Sum(nil)
 
 			req, err := CreateRequest(strings.NewReader(msg), &RequestOptions{
@@ -258,19 +265,19 @@ func BenchmarkCreateRequest(b *testing.B) {
 	reader := strings.NewReader("Content to be time-stamped")
 
 	for n := 0; n < b.N; n++ {
-		CreateRequest(reader, nil)
+		_, _ = CreateRequest(reader, nil)
 	}
 }
 
 func BenchmarkParseRequest(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		ParseRequest(reqNonce)
+		_, _ = ParseRequest(reqNonce)
 	}
 }
 
 func BenchmarkParseResponse(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		ParseResponse(respNonce)
+		_, _ = ParseResponse(respNonce)
 	}
 }
 
@@ -319,7 +326,10 @@ func TestCreateResponseWithIncludeTSACertificate(t *testing.T) {
 	tsaCert := getTSACert()
 
 	h := sha256.New()
-	h.Write([]byte("Hello World"))
+	_, err := h.Write([]byte("Hello World"))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	genTime := time.Now().UTC()
 
@@ -378,7 +388,10 @@ func TestCreateResponseWithNoTSACertificate(t *testing.T) {
 	tsaCert := getTSACert()
 
 	h := sha256.New()
-	h.Write([]byte("Hello World"))
+	_, err := h.Write([]byte("Hello World"))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	genTime := time.Now().UTC()
 
