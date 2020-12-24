@@ -45,12 +45,12 @@ func ExampleCreateRequest_ParseResponse() {
 	fmt.Println(tsResp.HashedMessage)
 	fmt.Println(tsResp.Policy)
 	if len(tsResp.Certificates) > 0 {
-		fmt.Println(tsResp.Certificates[0].Subject)
+		fmt.Println(tsResp.Certificates[0].Subject.Organization)
 	}
 
 	// Output:
 	// [140 222 43 143 28 80 96 97 4 176 145 205 188 119 197 142 149 101 26 96 188 163 178 64 230 162 199 171 176 178 173 128]
 	// 1.2.3.4.1
-	// CN=www.freetsa.org,OU=TSA,O=Free TSA,L=Wuerzburg,ST=Bayern,C=DE
+	// [Free TSA]
 
 }
