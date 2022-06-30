@@ -30,7 +30,7 @@ type response struct {
 }
 
 type pkiStatusInfo struct {
-	Status       int
+	Status       PKIStatus
 	StatusString string         `asn1:"optional"`
 	FailInfo     asn1.BitString `asn1:"optional"`
 }

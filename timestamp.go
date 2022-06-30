@@ -17,7 +17,7 @@ import (
 	"github.com/digitorus/pkcs7"
 )
 
-// FailureInfo contains the result of an Time-Stamp request. See
+// FailureInfo contains the failure details of an Time-Stamp request. See
 // https://tools.ietf.org/html/rfc3161#section-2.4.2
 type FailureInfo int
 
@@ -44,26 +44,6 @@ const (
 	SystemFailure FailureInfo = 25
 )
 
-const (
-	// Granted PKIStatus contains the value zero a TimeStampToken, as requested, is present.
-	Granted int = 0
-
-	// GrantedWithMods PKIStatus contains the value one a TimeStampToken, with modifications, is present.
-	GrantedWithMods int = 1
-
-	// Rejection PKIStatus
-	Rejection int = 2
-
-	// Waiting PKIStatus
-	Waiting int = 3
-
-	// RevocationWarning PKIStatus
-	RevocationWarning int = 4
-
-	// RevocationNotification PKIStatus
-	RevocationNotification int = 5
-)
-
 func (f FailureInfo) String() string {
 	switch f {
 	case BadAlgorithm:
@@ -84,6 +64,49 @@ func (f FailureInfo) String() string {
 		return "the request cannot be handled due to system failure"
 	default:
 		return "unknown failure: " + strconv.Itoa(int(f))
+	}
+}
+
+// PKIStatus contains the status of an Time-Stamp request. See
+// https://tools.ietf.org/html/rfc3161#section-2.4.2
+type PKIStatus int
+
+const (
+	// Granted PKIStatus contains the value zero a TimeStampToken, as requested, is present.
+	Granted PKIStatus = 0
+
+	// GrantedWithMods PKIStatus contains the value one a TimeStampToken, with modifications, is present.
+	GrantedWithMods PKIStatus = 1
+
+	// Rejection PKIStatus
+	Rejection PKIStatus = 2
+
+	// Waiting PKIStatus
+	Waiting PKIStatus = 3
+
+	// RevocationWarning PKIStatus
+	RevocationWarning PKIStatus = 4
+
+	// RevocationNotification PKIStatus
+	RevocationNotification PKIStatus = 5
+)
+
+func (s PKIStatus) String() string {
+	switch s {
+	case Granted:
+		return "the request is granted"
+	case GrantedWithMods:
+		return "the request is granted with modifications"
+	case Rejection:
+		return "the request is rejected"
+	case Waiting:
+		return "the request is waiting"
+	case RevocationWarning:
+		return "revocation is imminent"
+	case RevocationNotification:
+		return "revocation has occurred"
+	default:
+		return "unknown status: " + strconv.Itoa(int(s))
 	}
 }
 
@@ -405,7 +428,7 @@ func (t *Timestamp) CreateResponse(signingCert *x509.Certificate, priv crypto.Si
 }
 
 //CreateErrorResponse is used to create response other than granted and granted with mod status
-func CreateErrorResponse(pkiStatus int, pkiFailureInfo FailureInfo) ([]byte, error) {
+func CreateErrorResponse(pkiStatus PKIStatus, pkiFailureInfo FailureInfo) ([]byte, error) {
 	timestampRes := response{
 		Status: pkiStatusInfo{
 			Status:   pkiStatus,
