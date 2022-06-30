@@ -12,6 +12,7 @@ import (
 	"io"
 	"math/big"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/digitorus/pkcs7"
@@ -22,6 +23,8 @@ import (
 type FailureInfo int
 
 const (
+	// UnkownFailureInfo mean that no known failure info was provided
+	UnkownFailureInfo FailureInfo = -1
 	// BadAlgorithm defines an unrecognized or unsupported Algorithm Identifier
 	BadAlgorithm FailureInfo = 0
 	// BadRequest indicates that the transaction not permitted or supported
@@ -63,35 +66,32 @@ func (f FailureInfo) String() string {
 	case SystemFailure:
 		return "the request cannot be handled due to system failure"
 	default:
-		return "unknown failure: " + strconv.Itoa(int(f))
+		return "unknown failure"
 	}
 }
 
-// PKIStatus contains the status of an Time-Stamp request. See
+// Status contains the status of an Time-Stamp request. See
 // https://tools.ietf.org/html/rfc3161#section-2.4.2
-type PKIStatus int
+type Status int
 
 const (
-	// Granted PKIStatus contains the value zero a TimeStampToken, as requested, is present.
-	Granted PKIStatus = 0
-
-	// GrantedWithMods PKIStatus contains the value one a TimeStampToken, with modifications, is present.
-	GrantedWithMods PKIStatus = 1
-
+	// Granted PKIStatus contains the value zero a TimeStampToken, as requested,
+	// is present.
+	Granted Status = 0
+	// GrantedWithMods PKIStatus contains the value one a TimeStampToken, with
+	// modifications, is present.
+	GrantedWithMods Status = 1
 	// Rejection PKIStatus
-	Rejection PKIStatus = 2
-
+	Rejection Status = 2
 	// Waiting PKIStatus
-	Waiting PKIStatus = 3
-
+	Waiting Status = 3
 	// RevocationWarning PKIStatus
-	RevocationWarning PKIStatus = 4
-
+	RevocationWarning Status = 4
 	// RevocationNotification PKIStatus
-	RevocationNotification PKIStatus = 5
+	RevocationNotification Status = 5
 )
 
-func (s PKIStatus) String() string {
+func (s Status) String() string {
 	switch s {
 	case Granted:
 		return "the request is granted"
@@ -215,6 +215,9 @@ func (req *Request) Marshal() ([]byte, error) {
 // Timestamp represents an Time-Stamp. See:
 // https://tools.ietf.org/html/rfc3161#section-2.4.1
 type Timestamp struct {
+	// Timestamp token part of raw ASN.1 DER content.
+	RawToken []byte
+
 	HashAlgorithm crypto.Hash
 	HashedMessage []byte
 
@@ -263,8 +266,15 @@ func ParseResponse(bytes []byte) (*Timestamp, error) {
 	}
 
 	if resp.Status.Status > 0 {
-		return nil, ParseError(fmt.Sprintf("%s: %s",
-			FailureInfo(int(resp.Status.FailInfo.Bytes[0])).String(), resp.Status.StatusString))
+		var fis string
+		fi := resp.Status.FailureInfo()
+		if fi != UnkownFailureInfo {
+			fis = fi.String()
+		}
+		return nil, fmt.Errorf("%s: %s (%v)",
+			resp.Status.Status.String(),
+			strings.Join(resp.Status.StatusString, ","),
+			fis)
 	}
 
 	if len(resp.TimeStampToken.Bytes) == 0 {
@@ -305,6 +315,7 @@ func Parse(bytes []byte) (*Timestamp, error) {
 	}
 
 	ret := &Timestamp{
+		RawToken:      bytes,
 		HashedMessage: inf.MessageImprint.HashedMessage,
 		Time:          inf.Time,
 		Accuracy: time.Duration((time.Second * time.Duration(inf.Accuracy.Seconds)) +
@@ -427,12 +438,15 @@ func (t *Timestamp) CreateResponse(signingCert *x509.Certificate, priv crypto.Si
 	return tspResponseBytes, nil
 }
 
-//CreateErrorResponse is used to create response other than granted and granted with mod status
-func CreateErrorResponse(pkiStatus PKIStatus, pkiFailureInfo FailureInfo) ([]byte, error) {
+// CreateErrorResponse is used to create response other than granted and granted with mod status
+func CreateErrorResponse(pkiStatus Status, pkiFailureInfo FailureInfo) ([]byte, error) {
+	var bs asn1.BitString
+	setFlag(&bs, int(pkiFailureInfo))
+
 	timestampRes := response{
 		Status: pkiStatusInfo{
 			Status:   pkiStatus,
-			FailInfo: asn1.BitString{Bytes: []byte{byte(pkiFailureInfo)}, BitLength: 8},
+			FailInfo: bs,
 		},
 	}
 	tspResponseBytes, err := asn1.Marshal(timestampRes)
@@ -440,6 +454,18 @@ func CreateErrorResponse(pkiStatus PKIStatus, pkiFailureInfo FailureInfo) ([]byt
 		return nil, err
 	}
 	return tspResponseBytes, nil
+}
+
+func setFlag(bs *asn1.BitString, i int) {
+	for l := len(bs.Bytes); l < 4; l++ {
+		(*bs).Bytes = append((*bs).Bytes, byte(0))
+		(*bs).BitLength = len((*bs).Bytes) * 8
+	}
+	b := i / 8
+	p := uint(7 - (i - 8*b))
+	(*bs).Bytes[b] = (*bs).Bytes[b] | (1 << p)
+	bs.BitLength = asn1BitLength(bs.Bytes)
+	bs.Bytes = bs.Bytes[0 : (bs.BitLength/8)+1]
 }
 
 func getMessageImprint(hashAlgorithm crypto.Hash, hashedMessage []byte) messageImprint {

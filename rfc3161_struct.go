@@ -30,9 +30,22 @@ type response struct {
 }
 
 type pkiStatusInfo struct {
-	Status       PKIStatus
-	StatusString string         `asn1:"optional"`
+	Status       Status
+	StatusString []string       `asn1:"optional,utf8"`
 	FailInfo     asn1.BitString `asn1:"optional"`
+}
+
+func (s pkiStatusInfo) FailureInfo() FailureInfo {
+	fi := []FailureInfo{BadAlgorithm, BadRequest, BadDataFormat, TimeNotAvailable,
+		UnacceptedPolicy, UnacceptedExtension, AddInfoNotAvailable, SystemFailure}
+
+	for _, f := range fi {
+		if s.FailInfo.At(int(f)) != 0 {
+			return f
+		}
+	}
+
+	return UnkownFailureInfo
 }
 
 // eContent within SignedData is TSTInfo

@@ -5,7 +5,7 @@ import (
 	"encoding/asn1"
 )
 
-// TODO(vanbroup): content of this file is taken from "golang.org/x/crypto/ocsp"
+// TODO(vanbroup): taken from "golang.org/x/crypto/ocsp"
 // use directly from crypto/x509 when exported as suggested below.
 
 var hashOIDs = map[crypto.Hash]asn1.ObjectIdentifier{
@@ -32,4 +32,25 @@ func getOIDFromHashAlgorithm(target crypto.Hash) asn1.ObjectIdentifier {
 		}
 	}
 	return nil
+}
+
+// TODO(vanbroup): taken from golang.org/x/crypto/x509
+// asn1BitLength returns the bit-length of bitString by considering the
+// most-significant bit in a byte to be the "first" bit. This convention
+// matches ASN.1, but differs from almost everything else.
+func asn1BitLength(bitString []byte) int {
+	bitLen := len(bitString) * 8
+
+	for i := range bitString {
+		b := bitString[len(bitString)-i-1]
+
+		for bit := uint(0); bit < 8; bit++ {
+			if (b>>bit)&1 == 1 {
+				return bitLen
+			}
+			bitLen--
+		}
+	}
+
+	return 0
 }
