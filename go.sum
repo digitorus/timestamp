@@ -1,4 +1,2 @@
-github.com/digitorus/pkcs7 v0.0.0-20200320092839-808436b6f6d1 h1:V1cgDSp4Kq4eMCfazhWyqi2Js7BijkgPnp4Yej9CD9I=
-github.com/digitorus/pkcs7 v0.0.0-20200320092839-808436b6f6d1/go.mod h1:p2IZ9yq2kEKGFr3rfpYxaaOzB0VdLbF8VkZReEIpJmU=
-github.com/digitorus/pkcs7 v0.0.0-20220704143225-a9c8106cbfc6 h1:b98clxJQS08ohZb7PuAqYJw6WvIJGcAWoUVPgOHwNw0=
-github.com/digitorus/pkcs7 v0.0.0-20220704143225-a9c8106cbfc6/go.mod h1:ajT9Iifwrck892Z07+wD+dRRv9ULmlmPG0A+OHSrDuQ=
+github.com/digitorus/pkcs7 v0.0.0-20221019075359-21b8b40e6bb4 h1:MxNIia2F3bgFyNsOZy9UbNlpKAxbtCudkVmlJBNuvmg=
+github.com/digitorus/pkcs7 v0.0.0-20221019075359-21b8b40e6bb4/go.mod h1:SKVExuS+vpu2l9IoOc0RwqE7NYnb0JlcFHFnEJkVDzc=

@@ -591,7 +591,7 @@ func (t *Timestamp) populateSigningCertificateV2Ext(certificate *x509.Certificat
 	return signingCertV2Bytes, nil
 }
 
-func (t *Timestamp) generateSignedData(tstInfo []byte, privateKey crypto.PrivateKey, certificate *x509.Certificate) ([]byte, error) {
+func (t *Timestamp) generateSignedData(tstInfo []byte, signer crypto.Signer, certificate *x509.Certificate) ([]byte, error) {
 	signedData, err := pkcs7.NewSignedData(tstInfo)
 	if err != nil {
 		return nil, err
@@ -616,7 +616,7 @@ func (t *Timestamp) generateSignedData(tstInfo []byte, privateKey crypto.Private
 		signerInfoConfig.SkipCertificates = true
 	}
 
-	err = signedData.AddSigner(certificate, privateKey, signerInfoConfig)
+	err = signedData.AddSigner(certificate, signer, signerInfoConfig)
 	if err != nil {
 		return nil, err
 	}
