@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -33,7 +33,7 @@ func ExampleCreateRequest_ParseResponse() {
 		log.Fatal(tsr.Status)
 	}
 
-	resp, err := ioutil.ReadAll(tsr.Body)
+	resp, err := io.ReadAll(tsr.Body)
 	if err != nil {
 		log.Fatal(err)
 	}
