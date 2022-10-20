@@ -347,6 +347,59 @@ func ExampleParseRequest() {
 	// Output: 51a3620a3b62ffaff41a434e932223b31bc69e86490c365fa1186033904f1132
 }
 
+func TestCreateResponseWithNoTSACertificate(t *testing.T) {
+	tsakey := getTSARSAKey()
+	tsaCert := getTSACert()
+
+	h := sha256.New()
+	_, err := h.Write([]byte("Hello World"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	genTime := time.Now().UTC()
+
+	nonce := big.NewInt(0)
+	nonce = nonce.SetBytes([]byte{0x1, 0x2, 0x3})
+
+	duration, _ := time.ParseDuration("1s")
+
+	timestamp := Timestamp{
+		HashAlgorithm:     crypto.SHA256,
+		HashedMessage:     h.Sum(nil),
+		Time:              genTime,
+		Nonce:             nonce,
+		Policy:            asn1.ObjectIdentifier{2, 4, 5, 6},
+		Ordering:          true,
+		Accuracy:          duration,
+		Qualified:         false,
+		AddTSACertificate: false,
+	}
+	timestampBytes, err := timestamp.CreateResponse(tsaCert, tsakey)
+	if err != nil {
+		t.Errorf("unable to generate time stamp response: %s", err.Error())
+	}
+	timestampRes, err := ParseResponse(timestampBytes)
+	if err != nil {
+		t.Errorf("unable to parse time stamp response: %s", err.Error())
+	}
+
+	if timestampRes.HashAlgorithm.HashFunc() != crypto.SHA256 {
+		t.Errorf("expected hash algorithm is SHA256")
+	}
+	if len(timestampRes.HashedMessage) != 32 {
+		t.Errorf("got %d: expected: %d", len(timestampRes.HashedMessage), 32)
+	}
+
+	if timestampRes.Qualified {
+		t.Errorf("got %t: expected: %t", timestampRes.Qualified, true)
+	}
+
+	if timestampRes.AddTSACertificate {
+		t.Error("TSA certificate must not be included in timestamp response")
+	}
+}
+
 func TestCreateResponseWithIncludeTSACertificate(t *testing.T) {
 	tsakey := getTSARSAKey()
 	tsaCert := getTSACert()
@@ -409,9 +462,10 @@ func TestCreateResponseWithIncludeTSACertificate(t *testing.T) {
 	}
 }
 
-func TestCreateResponseWithNoTSACertificate(t *testing.T) {
-	tsakey := getTSARSAKey()
-	tsaCert := getTSACert()
+// Sign with TSU and do not embed certificates
+func TestSignWithTSUNoCertificate(t *testing.T) {
+	tsukey := getTSURSAKey()
+	tsuCert := getTSUCert()
 
 	h := sha256.New()
 	_, err := h.Write([]byte("Hello World"))
@@ -437,13 +491,13 @@ func TestCreateResponseWithNoTSACertificate(t *testing.T) {
 		Qualified:         false,
 		AddTSACertificate: false,
 	}
-	timestampBytes, err := timestamp.CreateResponse(tsaCert, tsakey)
+	timestampBytes, err := timestamp.CreateResponse(tsuCert, tsukey)
 	if err != nil {
 		t.Errorf("unable to generate time stamp response: %s", err.Error())
 	}
 	timestampRes, err := ParseResponse(timestampBytes)
 	if err != nil {
-		t.Errorf("unable to parse time stamp response: %s", err.Error())
+		t.Fatalf("unable to parse time stamp response: %s", err.Error())
 	}
 
 	if timestampRes.HashAlgorithm.HashFunc() != crypto.SHA256 {
@@ -462,6 +516,166 @@ func TestCreateResponseWithNoTSACertificate(t *testing.T) {
 	}
 }
 
+// Sign with TSU and only embed TSU certificate
+func TestSignWithTSUEmbedTSUCertificate(t *testing.T) {
+	tsukey := getTSURSAKey()
+	tsuCert := getTSUCert()
+
+	h := sha256.New()
+	_, err := h.Write([]byte("Hello World"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	genTime := time.Now().UTC()
+
+	nonce := big.NewInt(0)
+	nonce = nonce.SetBytes([]byte{0x1, 0x2, 0x3})
+
+	duration, _ := time.ParseDuration("1s")
+
+	timestamp := Timestamp{
+		HashAlgorithm:     crypto.SHA256,
+		HashedMessage:     h.Sum(nil),
+		Time:              genTime,
+		Nonce:             nonce,
+		Policy:            asn1.ObjectIdentifier{2, 4, 5, 6},
+		Ordering:          true,
+		Accuracy:          duration,
+		Qualified:         true,
+		AddTSACertificate: true,
+	}
+	timestampBytes, err := timestamp.CreateResponse(tsuCert, tsukey)
+	if err != nil {
+		t.Errorf("unable to generate time stamp response: %s", err.Error())
+	}
+
+	timestampRes, err := ParseResponse(timestampBytes)
+	if err != nil {
+		t.Fatalf("unable to parse time stamp response: %s", err.Error())
+	}
+
+	if timestampRes.HashAlgorithm.HashFunc() != crypto.SHA256 {
+		t.Errorf("expected hash algorithm is SHA256")
+	}
+	if len(timestampRes.HashedMessage) != 32 {
+		t.Errorf("got %d: expected: %d", len(timestampRes.HashedMessage), 32)
+	}
+
+	if timestampRes.Accuracy != duration {
+		t.Errorf("got accuracy %s: expected: %s", timestampRes.Accuracy, duration)
+	}
+
+	if !timestampRes.Qualified {
+		t.Errorf("got %t: expected: %t", timestampRes.Qualified, true)
+	}
+
+	if !timestampRes.AddTSACertificate {
+		t.Error("TSA certificate must be included in timestamp response")
+	}
+}
+
+// Sign with TSU and include certificate chain
+func TestSignWithTSUIncludeCertificateChain(t *testing.T) {
+	tsuKey := getTSURSAKey()
+	tsuCert := getTSUCert()
+	tsaCert := getTSACert()
+
+	h := sha256.New()
+	_, err := h.Write([]byte("Hello World"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	genTime := time.Now().UTC()
+
+	nonce := big.NewInt(0)
+	nonce = nonce.SetBytes([]byte{0x1, 0x2, 0x3})
+
+	duration, _ := time.ParseDuration("1s")
+
+	timestamp := Timestamp{
+		HashAlgorithm:     crypto.SHA256,
+		HashedMessage:     h.Sum(nil),
+		Time:              genTime,
+		Nonce:             nonce,
+		Policy:            asn1.ObjectIdentifier{2, 4, 5, 6},
+		Ordering:          true,
+		Accuracy:          duration,
+		Qualified:         true,
+		AddTSACertificate: true,
+		Certificates:      []*x509.Certificate{tsaCert}, // add parent certificate
+	}
+	timestampBytes, err := timestamp.CreateResponse(tsuCert, tsuKey)
+	if err != nil {
+		t.Fatalf("unable to generate time stamp response: %s", err.Error())
+	}
+
+	timestampRes, err := ParseResponse(timestampBytes)
+	if err != nil {
+		t.Fatalf("unable to parse time stamp response: %s", err.Error())
+	}
+
+	if timestampRes.HashAlgorithm.HashFunc() != crypto.SHA256 {
+		t.Errorf("expected hash algorithm is SHA256")
+	}
+	if len(timestampRes.HashedMessage) != 32 {
+		t.Errorf("got %d: expected: %d", len(timestampRes.HashedMessage), 32)
+	}
+
+	if timestampRes.Accuracy != duration {
+		t.Errorf("got accuracy %s: expected: %s", timestampRes.Accuracy, duration)
+	}
+
+	if !timestampRes.Qualified {
+		t.Errorf("got %t: expected: %t", timestampRes.Qualified, true)
+	}
+
+	if !timestampRes.AddTSACertificate {
+		t.Error("TSA certificate must be included in timestamp response")
+	}
+
+	if !timestamp.Certificates[0].Equal(tsaCert) {
+		t.Errorf("got certificate %X: expected: %X", timestamp.Certificates[0].SubjectKeyId, tsaCert.SubjectKeyId)
+	}
+}
+
+func getTSURSAKey() *rsa.PrivateKey {
+	tsuRSAKeyPEM := `
+-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEA7FzZ2Uff6dPKEgJNgUi3EL21y3CzY3zGE3Wi2pTM1oGAMetP
+ecEdFnMM2x76lnGuBk0VW04TdOMymXtW6L7X75Yr73/88b4Ycmrg2Xh/HqiCrtQZ
+PrCwOn3V8UFulySqJItBUZ1ih6a0A1NNX6lMmQTbbuxLlyP4iz1HveFmOa/gkLh9
+Y1I9yIRTb4Mlm6yISLQkDZn2YMXqlZUv4tyNUmFlSYrMu6lsIwBn2eaBKzQYPZM0
+ExuTDD+d7RnrDr1tcfd5cNOq7XDNP2nIDE4rZSwRhOerDKPL9jqd60FKH40oX51/
+WssiO1zVmi43uX8gr7iaJrzpkVNDN9m41zLheQIDAQABAoIBAQDA21odghnfjqGY
+ZCydSpmknUaSgpi8mnh8NEX3F+azN+ND1/53F+0F/kYFHJfW3VbjaU39vA0AGMmW
+lh7ptZ43rU6YEtRu427LHQ3uI/WFLHXE9ObMUhrY/wfr3DnCNXZmbwGS+FoG2SyU
+cgn1/guz51Ssgz2CSyVnZ078Tce9VISolxGnxZVhEVcssFazEWLaOe/8t2rMg4e+
+RRGiaTcIkTdNTFgk15JrkSRyvU/538vVwNJ67hAwlA011l3XDpVybwEQQ46bG09J
+uSNOEm4XMNRxjPS6A2Fd+jtSiP4iYEwVoJU+/P7IRdoVvBjwcXnl7tX9i7o8xwhr
+es+NzS8BAoGBAOxxSLk8QVYGoHn+H/I+SHBY8ipY/3mwCzH3shodfAejZ+eoMVI+
+cWJl67QKhsFzlAfRj1YF92h5Hx8oXVR7te7KcjXVyStPlAUigls253GaczSnXjA0
+0WxpFthES8TSbSfD1VTbU1JB6evUe8KkemEw+9vbl573U3FgEeu67LnxAoGBAP/p
+4HNC2JTFGox7IJoEvO2qeJfxtlyJ5vb/RwlJu/kn7mAFzzjIE1xYFDbImKN8OYA4
+BWXyZ+5WP+HZOBW16HXoYybT02ufFC3lp9p8xOSBs2DQKfrhqgJTOVjq7b4ovSj5
+3DOnR1YojbiDHQpK2IVIj1Iz0DiIFqPhtB7CzdgJAoGANC3f7bkldhWqTqHNbQlf
+tSN79eqEHtfB8LoIHQlKuOjP4mjU0aCkJyH0/VuhV4npLjyKFGLmsbChNKAU0LMo
+eFVHFShj5+H8+ZEfEYAxXXnHWORiveK6IOGkP//6dKo3mqH2L27jmXCgbgILee4Q
+b+h+fIuej19nk8quycYLvhECgYAwoJsyq6AF3NInoXnXalEQBBV4IcjaGqYVhvpT
+jHw4YtsLye7PRk1PfbkRk9pVLlSqxXpZHc+b3S20V5ctoOw0A11b0mJZD9hAxGO5
+w32SQgb4vXVMo7avTGsYN0PHn2waLigmdIG8oGYVimxpOUGdSeVZ5FiLdWh/6XJV
+agS9KQKBgGn6Gfp9/67F0zgJ5gh5DsuY6At9VcGnSPmKaO//ME05KMazF6XW2gWs
+/VmHEjBRBqXPylh3xmr5DMm95OeQm3QUsNf75aPFnkukRmgmeVIfICjx0twzls4O
+vwxcYS6/uRJ1O1K0U2KZgqY9HGSg4Mm4Zs8mAe86evHEGX7g7N6y
+-----END RSA PRIVATE KEY-----
+`
+
+	tsuKeyPEMBlock, _ := pem.Decode([]byte(tsuRSAKeyPEM))
+	pvtKey, _ := x509.ParsePKCS1PrivateKey(tsuKeyPEMBlock.Bytes)
+
+	return pvtKey
+}
 func getTSARSAKey() *rsa.PrivateKey {
 	tsaRSAKeyPEM := `
 -----BEGIN RSA PRIVATE KEY-----
@@ -498,7 +712,36 @@ YyOfhPUI5XhkyUlunO5pSAd0CtRv7NVW1wKDjMbJvgV0MlbVvGraAg==
 
 	return pvtKey
 }
+func getTSUCert() *x509.Certificate {
+	tsaCertPEM := `
+-----BEGIN CERTIFICATE-----
+MIIDrTCCApWgAwIBAgITHtUKVw2T5tfI4jk7zfJvKj39MDANBgkqhkiG9w0BAQsF
+ADBdMQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwY
+SW50ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMRYwFAYDVQQDDA1UZXN0IFJTQSBDZXJ0
+MB4XDTIyMTAxODA2MzYxNloXDTQyMTAxODA2MzYxNlowYzELMAkGA1UEBhMCQVUx
+EzARBgNVBAgTClNvbWUtU3RhdGUxITAfBgNVBAsTGEludGVybmV0IFdpZGdpdHMg
+UHR5IEx0ZDEcMBoGA1UEAxMTVGVzdCBSU0EgQ2hpbGQgQ2VydDCCASIwDQYJKoZI
+hvcNAQEBBQADggEPADCCAQoCggEBAOxc2dlH3+nTyhICTYFItxC9tctws2N8xhN1
+otqUzNaBgDHrT3nBHRZzDNse+pZxrgZNFVtOE3TjMpl7Vui+1++WK+9//PG+GHJq
+4Nl4fx6ogq7UGT6wsDp91fFBbpckqiSLQVGdYoemtANTTV+pTJkE227sS5cj+Is9
+R73hZjmv4JC4fWNSPciEU2+DJZusiEi0JA2Z9mDF6pWVL+LcjVJhZUmKzLupbCMA
+Z9nmgSs0GD2TNBMbkww/ne0Z6w69bXH3eXDTqu1wzT9pyAxOK2UsEYTnqwyjy/Y6
+netBSh+NKF+df1rLIjtc1ZouN7l/IK+4mia86ZFTQzfZuNcy4XkCAwEAAaNgMF4w
+DgYDVR0PAQH/BAQDAgeAMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYEFCFNxjsFpw4I
+5p+o62/J17zDEa8FMB8GA1UdIwQYMBaAFIjUWTfL8OkBDBFeGipGGN5BGygKMA0G
+CSqGSIb3DQEBCwUAA4IBAQCYdgikay21S2fYz+mk3dnhUPLnXI9Gg6U9ox2js+Yf
+dYOMXX5RlG2HKOEnVI7mOPEaEiSAuvE8x6mQ52xVOw4FWjPO7S5pCBO8YPyyZCer
+5bOFhz/zbv7xpZISvTTPfOXqSM1MvkcX9kfPDRagGfB6viVQwhWMQK4Sd0d5wSf2
+FHsUAuq+EauBDgTe4bdCMS/AQSF/xhFL1KUwvkI8HjDE+JGu7hexWtlxwD/dnvpD
+6ZrUnRLuSF3jebNb2DwIXb05ub+YJoBx/0I/zYe3vWISDtO/onNAZz9hnmAzL32f
+69EW22PQaOUDtTbfT2PD09uTUfmA+zZggjPgaWjbw+gf
+-----END CERTIFICATE-----
+`
+	certPEMBlock, _ := pem.Decode([]byte(tsaCertPEM))
+	tsaCert, _ := x509.ParseCertificate(certPEMBlock.Bytes)
 
+	return tsaCert
+}
 func getTSACert() *x509.Certificate {
 	tsaCertPEM := `
 -----BEGIN CERTIFICATE-----
