@@ -381,7 +381,7 @@ func TestCreateResponseWithNoTSACertificate(t *testing.T) {
 	}
 	timestampRes, err := ParseResponse(timestampBytes)
 	if err != nil {
-		t.Errorf("unable to parse time stamp response: %s", err.Error())
+		t.Fatalf("unable to parse time stamp response: %s", err.Error())
 	}
 
 	if timestampRes.HashAlgorithm.HashFunc() != crypto.SHA256 {
