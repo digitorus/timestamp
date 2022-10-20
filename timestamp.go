@@ -616,7 +616,11 @@ func (t *Timestamp) generateSignedData(tstInfo []byte, signer crypto.Signer, cer
 		signerInfoConfig.SkipCertificates = true
 	}
 
-	err = signedData.AddSigner(certificate, signer, signerInfoConfig)
+	if len(t.Certificates) > 0 {
+		err = signedData.AddSignerChain(certificate, signer, t.Certificates, signerInfoConfig)
+	} else {
+		err = signedData.AddSigner(certificate, signer, signerInfoConfig)
+	}
 	if err != nil {
 		return nil, err
 	}
