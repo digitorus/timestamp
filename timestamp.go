@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
@@ -23,8 +24,8 @@ import (
 type FailureInfo int
 
 const (
-	// UnkownFailureInfo mean that no known failure info was provided
-	UnkownFailureInfo FailureInfo = -1
+	// UnknownFailureInfo mean that no known failure info was provided
+	UnknownFailureInfo FailureInfo = -1
 	// BadAlgorithm defines an unrecognized or unsupported Algorithm Identifier
 	BadAlgorithm FailureInfo = 0
 	// BadRequest indicates that the transaction not permitted or supported
@@ -150,19 +151,7 @@ type Request struct {
 	ExtraExtensions []pkix.Extension
 }
 
-// ParseRequest parses an timestamp request in DER form.
-func ParseRequest(bytes []byte) (*Request, error) {
-	var err error
-	var rest []byte
-	var req request
-
-	if rest, err = asn1.Unmarshal(bytes, &req); err != nil {
-		return nil, err
-	}
-	if len(rest) > 0 {
-		return nil, ParseError("trailing data in Time-Stamp request")
-	}
-
+func buildRequest(req request) (*Request, error) {
 	if len(req.MessageImprint.HashedMessage) == 0 {
 		return nil, ParseError("Time-Stamp request contains no hashed message")
 	}
@@ -180,6 +169,32 @@ func ParseRequest(bytes []byte) (*Request, error) {
 		TSAPolicyOID:  req.ReqPolicy,
 		Extensions:    req.Extensions,
 	}, nil
+}
+
+// ParseRequestFromJSON parses an timestamp request in JSON form.
+func ParseRequestFromJSON(bytes []byte) (*Request, error) {
+	var req request
+
+	if err := json.Unmarshal(bytes, &req); err != nil {
+		return nil, err
+	}
+
+	return buildRequest(req)
+}
+
+// ParseRequest parses an timestamp request in DER form.
+func ParseRequest(bytes []byte) (*Request, error) {
+	var req request
+
+	rest, err := asn1.Unmarshal(bytes, &req)
+	if err != nil {
+		return nil, err
+	}
+	if len(rest) > 0 {
+		return nil, ParseError("trailing data in Time-Stamp request")
+	}
+
+	return buildRequest(req)
 }
 
 // Marshal marshals the Time-Stamp request to ASN.1 DER encoded form.
@@ -268,7 +283,7 @@ func ParseResponse(bytes []byte) (*Timestamp, error) {
 	if resp.Status.Status > 0 {
 		var fis string
 		fi := resp.Status.FailureInfo()
-		if fi != UnkownFailureInfo {
+		if fi != UnknownFailureInfo {
 			fis = fi.String()
 		}
 		return nil, fmt.Errorf("%s: %s (%v)",
@@ -553,7 +568,7 @@ func (t *Timestamp) populateSigningCertificateV2Ext(certificate *x509.Certificat
 		return nil, x509.ErrUnsupportedAlgorithm
 	}
 	if t.HashAlgorithm.HashFunc() == crypto.SHA1 {
-		return nil, fmt.Errorf("for SHA1 usae ESSCertID instead of ESSCertIDv2")
+		return nil, fmt.Errorf("for SHA1 use ESSCertID instead of ESSCertIDv2")
 	}
 
 	h := t.HashAlgorithm.HashFunc().New()
@@ -632,7 +647,7 @@ func (t *Timestamp) generateSignedData(tstInfo []byte, signer crypto.Signer, cer
 	return signature, nil
 }
 
-// copied from cryto/x509 package
+// copied from crypto/x509 package
 // oidNotInExtensions reports whether an extension with the given oid exists in
 // extensions.
 func oidInExtensions(oid asn1.ObjectIdentifier, extensions []pkix.Extension) bool {

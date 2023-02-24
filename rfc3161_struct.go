@@ -10,17 +10,17 @@ import (
 // http://www.ietf.org/rfc/rfc3161.txt
 // 2.4.1. Request Format
 type request struct {
-	Version        int
-	MessageImprint messageImprint
-	ReqPolicy      asn1.ObjectIdentifier `asn1:"optional"`
-	Nonce          *big.Int              `asn1:"optional"`
-	CertReq        bool                  `asn1:"optional,default:false"`
-	Extensions     []pkix.Extension      `asn1:"tag:0,optional"`
+	Version        int `json:"version"`
+	MessageImprint messageImprint `json:"messageImprint"`
+	ReqPolicy      asn1.ObjectIdentifier `asn1:"optional" json:"reqPolicy,omitempty"`
+	Nonce          *big.Int              `asn1:"optional" json:"nonce,omitempty"`
+	CertReq        bool                  `asn1:"optional,default:false" json:"certReq,omitempty"`
+	Extensions     []pkix.Extension      `asn1:"tag:0,optional" json:"extensions,omitempty"`
 }
 
 type messageImprint struct {
-	HashAlgorithm pkix.AlgorithmIdentifier
-	HashedMessage []byte
+	HashAlgorithm pkix.AlgorithmIdentifier `json:"hashAlgorithm"`
+	HashedMessage []byte `json:"hashedMessage"`
 }
 
 // 2.4.2. Response Format
@@ -45,7 +45,7 @@ func (s pkiStatusInfo) FailureInfo() FailureInfo {
 		}
 	}
 
-	return UnkownFailureInfo
+	return UnknownFailureInfo
 }
 
 // eContent within SignedData is TSTInfo
