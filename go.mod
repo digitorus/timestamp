@@ -1,5 +1,5 @@
 module github.com/digitorus/timestamp
 
-go 1.16
+go 1.27
 
-require github.com/digitorus/pkcs7 v0.0.0-20230713084857-e76b763bdc49
+require github.com/digitorus/pkcs7 v0.0.0-20260914070511-d678ea5ea03f

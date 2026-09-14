@@ -12,10 +12,9 @@ import (
 	"github.com/digitorus/timestamp"
 )
 
-// ExampleCreateRequest_ParseResponse demonstrates the creation of a time-stamp request, sending
+// ExampleCreateRequest_parseResponse demonstrates the creation of a time-stamp request, sending
 // it to the server and parsing the response.
-// nolint: govet
-func ExampleCreateRequest_ParseResponse() {
+func ExampleCreateRequest_parseResponse() {
 	tsq, err := timestamp.CreateRequest(strings.NewReader("ExampleCreateRequestParseResponse"), &timestamp.RequestOptions{
 		Hash:         crypto.SHA256,
 		Certificates: true,
@@ -43,7 +42,7 @@ func ExampleCreateRequest_ParseResponse() {
 		log.Fatal(err)
 	}
 
-	fmt.Println(tsResp.HashedMessage)
+	fmt.Printf("%v\n", tsResp.HashedMessage)
 	fmt.Println(tsResp.Policy)
 	for _, c := range tsResp.Certificates {
 		fmt.Println(c.Subject.Organization, c.Subject.OrganizationalUnit)
