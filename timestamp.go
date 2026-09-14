@@ -531,9 +531,9 @@ func (t *Timestamp) populateTSTInfo(messageImprint messageImprint, policyOID asn
 			if ms != 0 {
 				tstInfo.Accuracy.Milliseconds = int64(ms.Milliseconds())
 			}
-			microSeconds := (t.Accuracy - seconds - ms).Truncate(time.Microsecond)
-			if microSeconds != 0 {
-				tstInfo.Accuracy.Microseconds = int64(microSeconds.Microseconds())
+			us := (t.Accuracy - seconds - ms).Truncate(time.Microsecond)
+			if us != 0 {
+				tstInfo.Accuracy.Microseconds = int64(us.Microseconds())
 			}
 		}
 	}
